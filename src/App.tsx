@@ -42,17 +42,18 @@ const MapPinOff = ({className}) => <i className={`fa-solid fa-location-dot opaci
 const Trash2 = ({className}) => <i className={`fa-solid fa-trash ${className}`}></i>;
 const Camera = ({className}) => <i className={`fa-solid fa-camera ${className}`}></i>;
 const ImageIcon = ({className}) => <i className={`fa-solid fa-image ${className}`}></i>;
-const Check = ({className}) => <i className={`fa-solid fa-check ${className}`}></i>;
 const Info = ({className}) => <i className={`fa-solid fa-circle-info ${className}`}></i>;
 const Lock = ({className}) => <i className={`fa-solid fa-lock ${className}`}></i>;
 const Mail = ({className}) => <i className={`fa-solid fa-envelope ${className}`}></i>;
 const LogOut = ({className}) => <i className={`fa-solid fa-right-from-bracket ${className}`}></i>;
 const ShieldAlert = ({className}) => <i className={`fa-solid fa-shield-halved ${className}`}></i>;
+const UserCog = ({className}) => <i className={`fa-solid fa-users-gear ${className}`}></i>;
+const UserPlus = ({className}) => <i className={`fa-solid fa-user-plus ${className}`}></i>;
 
 // === FIREBASE IMPORTS ===
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, doc, setDoc, deleteDoc, getDoc, onSnapshot } from 'firebase/firestore';
 
 // === FIREBASE CONFIGURATION ===
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
@@ -64,9 +65,15 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
   appId: "1:1065543308691:web:46ae59e9dd9f92a3f60466"
 };
 
+// Inisialisasi App Utama (Untuk Login & Database)
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Inisialisasi App Kedua (KHUSUS untuk bikin akun baru tanpa logout otomatis)
+const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
+const secondaryAuth = getAuth(secondaryApp);
+
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'ragunan-autodebet-app';
 
 const defaultHolidays = {
@@ -88,7 +95,9 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  // States Utama
   const [merchants, setMerchants] = useState([]);
+  const [systemUsers, setSystemUsers] = useState([]); // List akun
   const [isDbLoading, setIsDbLoading] = useState(true);
 
   // Fungsi Format Rupiah
@@ -110,89 +119,117 @@ export default function App() {
     setConfirmDialog({ show: true, message, onConfirm: () => { actionFn(); setConfirmDialog({show:false}); } });
   };
 
-  // 1. Inisialisasi Auth Firebase (Background Auth)
+  // 1. Inisialisasi Auth Real Firebase
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth); 
-        }
-      } catch (error) {
-        console.warn("Auth initialization failed.", error);
-      }
-    };
-    initAuth();
-
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
+      
+      if (currentUser && currentUser.email) {
+        // Ambil role dari Firestore (Koleksi user_roles)
+        try {
+          const roleDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', currentUser.email);
+          const roleSnap = await getDoc(roleDocRef);
+          
+          let determinedRole = 'petugas';
+          
+          if (roleSnap.exists()) {
+             determinedRole = roleSnap.data().role;
+          } else {
+             // Fallback: Jika ini akun lama yang ada "admin" di emailnya, kita auto-assign jadi admin
+             if (currentUser.email.toLowerCase().includes('admin')) {
+                determinedRole = 'admin';
+                // Auto simpan role-nya ke DB agar tercatat
+                await setDoc(roleDocRef, { email: currentUser.email, role: 'admin', createdAt: new Date().toISOString() });
+             } else {
+                // Auto simpan sebagai petugas
+                await setDoc(roleDocRef, { email: currentUser.email, role: 'petugas', createdAt: new Date().toISOString() });
+             }
+          }
+          
+          setAppUser({ email: currentUser.email, role: determinedRole });
+          setUserRole(determinedRole);
+          if (determinedRole === 'admin') setActiveMenu('dashboard');
+          else setActiveMenu('peta');
+
+        } catch (error) {
+          console.error("Gagal mengambil role:", error);
+          showToast("Terjadi kesalahan saat memuat hak akses.", "error");
+        }
+      } else {
+        setAppUser(null);
+        setUserRole(null);
+      }
       setIsAuthChecking(false);
     });
+
     return () => unsubscribe();
   }, []);
 
-  // Handler Login Bypass
-  const handleLogin = (e) => {
+  // Handler Login Asli ke Firebase
+  const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) return showToast("Email dan Password wajib diisi.", "error");
     
     setIsLoggingIn(true);
-    
-    setTimeout(() => {
-      const emailInput = loginEmail.toLowerCase();
-      let determinedRole = 'petugas';
-      
-      if (emailInput.includes('admin')) {
-        determinedRole = 'admin';
-      }
-
-      setAppUser({ email: emailInput, role: determinedRole });
-      setUserRole(determinedRole);
-      
-      if (determinedRole === 'admin') {
-        setActiveMenu('dashboard');
-        showToast("Berhasil masuk sebagai Administrator!", "success");
-      } else {
-        setActiveMenu('peta');
-        showToast("Berhasil masuk sebagai Petugas Lapangan!", "success");
-      }
-      
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      showToast("Berhasil masuk ke sistem!", "success");
       setLoginPassword('');
+    } catch (error) {
+      console.error(error);
+      let errMsg = "Email atau password salah.";
+      if (error.code === 'auth/user-not-found') errMsg = "Akun tidak ditemukan.";
+      if (error.code === 'auth/wrong-password') errMsg = "Password yang Anda masukkan salah.";
+      if (error.code === 'auth/invalid-credential') errMsg = "Email atau Password tidak valid.";
+      if (error.code === 'auth/too-many-requests') errMsg = "Terlalu banyak percobaan. Coba lagi nanti.";
+      showToast(errMsg, "error");
+    } finally {
       setIsLoggingIn(false);
-    }, 800);
+    }
   };
 
-  const handleLogout = () => {
-    requestConfirm("Anda yakin ingin keluar dari sistem aplikasi?", () => {
-      setAppUser(null);
-      setUserRole(null);
+  const handleLogout = async () => {
+    requestConfirm("Anda yakin ingin keluar dari sistem aplikasi?", async () => {
+      await signOut(auth);
       showToast("Sesi telah diakhiri. Berhasil keluar.", "info");
     });
   };
 
-  // 2. Listener Realtime Database Firestore
+  // 2. Listener Database Realtime
   useEffect(() => {
     if (!firebaseUser || !appUser) {
       setMerchants([]);
+      setSystemUsers([]);
       return;
     }
     
     setIsDbLoading(true);
-    const merchantsRef = collection(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan');
     
-    const unsubscribe = onSnapshot(merchantsRef, (snapshot) => {
+    // Listener Master Data Pedagang
+    const merchantsRef = collection(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan');
+    const unsubMerchants = onSnapshot(merchantsRef, (snapshot) => {
       const data = [];
       snapshot.forEach(doc => data.push(doc.data()));
       setMerchants(data);
       setIsDbLoading(false);
     }, (error) => {
       console.error("Firestore Listen Error:", error);
-      showToast("Gagal memuat database. Periksa koneksi atau izin.", "error");
+      showToast("Gagal memuat data pedagang.", "error");
       setIsDbLoading(false);
     });
 
-    return () => unsubscribe();
+    // Listener Akun (Hanya berguna untuk Admin, tapi kita load saja)
+    let unsubUsers = () => {};
+    if (appUser.role === 'admin') {
+       const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'user_roles');
+       unsubUsers = onSnapshot(usersRef, (snapshot) => {
+          const uData = [];
+          snapshot.forEach(doc => uData.push(doc.data()));
+          setSystemUsers(uData);
+       });
+    }
+
+    return () => { unsubMerchants(); unsubUsers(); };
   }, [firebaseUser, appUser]);
 
   const [activeMenu, setActiveMenu] = useState('dashboard');
@@ -214,10 +251,14 @@ export default function App() {
   const [editModal, setEditModal] = useState({ isOpen: false, data: null });
   const [isCompressing, setIsCompressing] = useState(false);
 
+  // User Management State
+  const [newUserReg, setNewUserReg] = useState({ email: '', password: '', role: 'petugas' });
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+
   // Kalender States
   const [specialDates, setSpecialDates] = useState(defaultHolidays);
-  const [calMonth, setCalMonth] = useState(5); 
-  const [calYear, setCalYear] = useState(2026); 
+  const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1); 
+  const [calYear, setCalYear] = useState(new Date().getFullYear()); 
   const [isSyncing, setIsSyncing] = useState(false);
   const [calendarModal, setCalendarModal] = useState({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' });
 
@@ -233,8 +274,8 @@ export default function App() {
 
   // Generate States
   const [formGenerate, setFormGenerate] = useState({
-    kategoriExport: 'Semua', periode: '05/2026', keterangan3: 'MAKANAN/MINUMAN',
-    jenisTagihan: 'TAG PED', deskripsi: 'TAGIHAN PEDAGANG', tglMulaiBayar: '2026-05-06',
+    kategoriExport: 'Semua', periode: `${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`, keterangan3: 'MAKANAN/MINUMAN',
+    jenisTagihan: 'TAG PED', deskripsi: 'TAGIHAN PEDAGANG', tglMulaiBayar: new Date().toISOString().split('T')[0],
     tglJatuhTempo: '20', jenisRekTujuan: 'GIRO KONVEN', rekTujuan: '40142900127', kodePlan: 'TMR01', defaultEmail: 'ebahislamiyah05@gmail.com'
   });
   const [defaultTagihanInput, setDefaultTagihanInput] = useState(285000);
@@ -286,6 +327,55 @@ export default function App() {
   const hapusFoto = (mode) => {
     if (mode === 'ADD') setNewMerchant(prev => ({ ...prev, fotoLapak: '' }));
     else setEditModal(prev => ({ ...prev, data: { ...prev.data, fotoLapak: '' } }));
+  };
+
+  // FUNGSI TAMBAH USER / AKUN BARU
+  const handleRegisterUser = async (e) => {
+     e.preventDefault();
+     if (userRole !== 'admin') return;
+     if (!newUserReg.email || !newUserReg.password) return showToast("Email dan password wajib diisi.", "error");
+     if (newUserReg.password.length < 6) return showToast("Password minimal 6 karakter.", "error");
+
+     setIsCreatingUser(true);
+     try {
+       // Buat akun di Firebase Auth menggunakan Secondary App agar Admin tidak logout
+       await createUserWithEmailAndPassword(secondaryAuth, newUserReg.email, newUserReg.password);
+       
+       // Catat role-nya di Firestore Database
+       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', newUserReg.email.toLowerCase()), {
+          email: newUserReg.email.toLowerCase(),
+          role: newUserReg.role,
+          createdAt: new Date().toISOString(),
+          createdBy: appUser.email
+       });
+
+       // Logout dari Secondary App
+       await signOut(secondaryAuth);
+
+       showToast(`Akun ${newUserReg.email} berhasil didaftarkan sebagai ${newUserReg.role}!`, "success");
+       setNewUserReg({ email: '', password: '', role: 'petugas' });
+
+     } catch (error) {
+       console.error("Gagal buat akun:", error);
+       if (error.code === 'auth/email-already-in-use') showToast("Email tersebut sudah terdaftar.", "error");
+       else showToast("Gagal membuat akun. Pastikan koneksi stabil.", "error");
+     } finally {
+       setIsCreatingUser(false);
+     }
+  };
+
+  const handleDeleteUser = (emailTarget) => {
+     if (userRole !== 'admin') return;
+     if (emailTarget === appUser.email) return showToast("Anda tidak bisa menghapus akun Anda sendiri.", "error");
+     
+     requestConfirm(`Anda yakin ingin mencabut hak akses akun ${emailTarget}? (Akun tidak bisa login ke app ini lagi)`, async () => {
+        try {
+           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', emailTarget));
+           showToast("Hak akses akun berhasil dicabut.", "success");
+        } catch (error) {
+           showToast("Gagal menghapus akun.", "error");
+        }
+     });
   };
 
   // EXTERNAL LIBRARIES INJECTION (FontAwesome, Excel, Leaflet)
@@ -522,12 +612,9 @@ export default function App() {
           const lokasiDetail = row['KETERANGAN 1'] || row['LOKASI'] || row['ALAMAT'] || '-';
           const jenisUsaha = row['JENIS USAHA'] || row['USAHA'] || row['JENIS PRODUK'] || row['PRODUK'] || row['KETERANGAN 3'] || '-';
           
-          // --- PERBAIKAN UNTUK VERCEL / FIREBASE ---
-          // Mengganti karakter garis miring (/) dengan strip (-) agar Firebase tidak menganggapnya sebagai sub-folder
           const safeRawId = String(rawId).replace(/\//g, '-').trim();
           const safeLokasi = String(lokasiDetail).replace(/\//g, '-').trim();
           const uid = safeRawId + '_' + safeLokasi;
-          // -----------------------------------------
 
           const existingIdx = merchants.findIndex(ex => ex.uid === uid);
 
@@ -580,7 +667,7 @@ export default function App() {
         showToast(`Import Selesai! ${addedCount} Baru, ${updatedCount} Diperbarui ke Cloud.`, "success");
       } catch (err) { 
         console.error("ERROR FIREBASE SAAT IMPORT:", err);
-        showToast("Gagal membaca Excel/Upload ke Cloud. Buka Console (F12) untuk detail error.", "error"); 
+        showToast("Gagal membaca Excel/Upload ke Cloud.", "error"); 
       }
     };
     reader.readAsArrayBuffer(file); e.target.value = null;
@@ -607,7 +694,6 @@ export default function App() {
     if (userRole !== 'admin') return;
     if(!newMerchant.accountId || !newMerchant.nama) return showToast('ID dan Nama wajib diisi!', "error");
     
-    // PERBAIKAN: Sama seperti import excel, bersihkan slash pada ID manual
     const safeRawId = String(newMerchant.accountId).replace(/\//g, '-').trim();
     const safeLokasi = String(newMerchant.keterangan).replace(/\//g, '-').trim();
     const newUid = safeRawId + '_' + safeLokasi;
@@ -891,7 +977,7 @@ export default function App() {
 
                    <form onSubmit={handleLogin} className="space-y-5">
                       <div>
-                         <label className="block text-[11px] font-extrabold text-slate-500 mb-1.5 uppercase tracking-wider">Alamat Email Akses</label>
+                         <label className="block text-[11px] font-extrabold text-slate-500 mb-1.5 uppercase tracking-wider">Alamat Email Terdaftar</label>
                          <div className="relative">
                             <Mail className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
                             <input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-700 text-sm" placeholder="Ketik email..." />
@@ -905,15 +991,13 @@ export default function App() {
                          </div>
                       </div>
                       <button type="submit" disabled={isLoggingIn} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 mt-6 disabled:opacity-70 disabled:cursor-not-allowed">
-                         {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : "Masuk ke Dalam Sistem"}
+                         {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : "Masuk ke Sistem Terpadu"}
                       </button>
                    </form>
 
                    <div className="mt-8 text-center border-t border-slate-100 pt-6">
-                      <p className="text-[10px] text-slate-500 font-bold flex flex-col items-center justify-center gap-1.5">
-                         <span className="flex items-center gap-1"><ShieldAlert className="w-3 h-3 text-amber-500" /> Aturan Role Akses Sistem:</span>
-                         <span className="text-slate-400">Email mengandung kata <b>"admin"</b> = Akses Penuh</span>
-                         <span className="text-slate-400">Email lainnya = Akses Petugas Lapangan (Peta)</span>
+                      <p className="text-[10px] text-slate-500 font-bold flex items-center justify-center gap-1.5">
+                         <ShieldAlert className="w-3 h-3 text-emerald-500" /> Tersambung aman ke Firebase Auth
                       </p>
                    </div>
                </div>
@@ -938,13 +1022,13 @@ export default function App() {
               <div className="p-6 border-b border-slate-800 flex justify-between items-center shrink-0">
                 <div>
                   <h1 className="text-xl font-extrabold flex items-center gap-2"><Database className="w-6 h-6 text-blue-400" /> SIM AutoDebet</h1>
-                  <p className="text-slate-400 text-[11px] uppercase tracking-wider font-semibold mt-1.5 flex items-center gap-1">
-                     {userRole === 'admin' ? 'Administrator' : 'Petugas Lapangan'} <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" title="Cloud Active"></span>
+                  <p className="text-slate-400 text-[10px] truncate uppercase tracking-wider font-semibold mt-1.5 flex items-center gap-1">
+                     <span title={appUser.email}>{appUser.email.split('@')[0]}</span> ({userRole === 'admin' ? 'Admin' : 'Petugas'}) <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" title="Cloud Active"></span>
                   </p>
                 </div>
                 <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden p-2 text-slate-400 hover:text-white rounded-lg bg-slate-800 transition-colors"><X className="w-5 h-5" /></button>
               </div>
-              <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+              <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
                 {userRole === 'admin' && (
                    <button onClick={() => handleMenuClick('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard className="w-5 h-5" /> Dashboard Tagihan</button>
                 )}
@@ -958,6 +1042,10 @@ export default function App() {
                       <div className="my-4 border-t border-slate-800"></div>
                       <button onClick={() => handleMenuClick('generate')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'generate' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><Download className="w-5 h-5" /> Generate Target Bank</button>
                       <button onClick={() => handleMenuClick('rekon')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'rekon' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><RefreshCw className="w-5 h-5" /> Rekonsiliasi Laporan</button>
+                      
+                      {/* TAMBAHAN MENU MANAJEMEN AKUN */}
+                      <div className="my-4 border-t border-slate-800"></div>
+                      <button onClick={() => handleMenuClick('manajemen-akun')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'manajemen-akun' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><UserCog className="w-5 h-5" /> Manajemen Akun</button>
                    </>
                 )}
               </nav>
@@ -975,7 +1063,7 @@ export default function App() {
                    <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden p-2.5 text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shadow-sm"><Menu className="w-5 h-5" /></button>
                    <div>
                      <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">
-                       {activeMenu === 'dashboard' ? 'Dashboard Pemantauan Tagihan' : activeMenu === 'peta' ? 'Pemetaan Lokasi Pedagang Berbasis Google Maps' : activeMenu === 'kelola-data' ? 'Pengelolaan Master Data Pedagang' : activeMenu === 'kalender' ? 'Pengaturan Kalender & Tarif' : activeMenu === 'generate' ? 'Pembuatan File Target Bank' : 'Rekonsiliasi Laporan Bank'}
+                       {activeMenu === 'dashboard' ? 'Dashboard Pemantauan Tagihan' : activeMenu === 'peta' ? 'Pemetaan Lokasi Pedagang Berbasis Google Maps' : activeMenu === 'kelola-data' ? 'Pengelolaan Master Data Pedagang' : activeMenu === 'kalender' ? 'Pengaturan Kalender & Tarif' : activeMenu === 'generate' ? 'Pembuatan File Target Bank' : activeMenu === 'manajemen-akun' ? 'Manajemen Akun Firebase' : 'Rekonsiliasi Laporan Bank'}
                      </h2>
                      <p className="text-xs font-medium text-slate-500 mt-1 hidden sm:block">
                        {activeMenu === 'kelola-data' ? 'Kelola identitas, titik GPS, dan potret foto lapak pedagang untuk validasi lapangan.' : 'Terkoneksi langsung ke Cloud Database Firebase.'}
@@ -1135,6 +1223,90 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+                )}
+
+                {/* MENU BARU: MANAJEMEN AKUN FIREBASE */}
+                {userRole === 'admin' && activeMenu === 'manajemen-akun' && (
+                   <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in">
+                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                         <div className="flex items-center gap-4 mb-6 border-b border-slate-100 pb-4">
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0"><UserCog className="w-6 h-6 text-blue-600" /></div>
+                            <div>
+                              <h2 className="text-xl font-bold text-slate-800">Manajemen Akun Sistem</h2>
+                              <p className="text-slate-500 text-sm mt-1">Daftarkan akun email petugas baru atau cabut akses akun lama secara langsung ke Firebase Auth.</p>
+                            </div>
+                         </div>
+
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            
+                            <div className="md:col-span-1 bg-slate-50 p-5 rounded-xl border border-slate-200 h-fit">
+                               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><UserPlus className="w-4 h-4 text-emerald-600"/> Daftarkan Akun Baru</h3>
+                               <form onSubmit={handleRegisterUser} className="space-y-4">
+                                  <div>
+                                     <label className="block text-xs font-bold text-slate-600 mb-1">Email Pendaftaran</label>
+                                     <input type="email" required value={newUserReg.email} onChange={e => setNewUserReg({...newUserReg, email: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white" placeholder="petugas@ragunan.com"/>
+                                  </div>
+                                  <div>
+                                     <label className="block text-xs font-bold text-slate-600 mb-1">Password Awal (Min 6 Karakter)</label>
+                                     <input type="password" required value={newUserReg.password} onChange={e => setNewUserReg({...newUserReg, password: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white" placeholder="••••••••"/>
+                                  </div>
+                                  <div>
+                                     <label className="block text-xs font-bold text-slate-600 mb-1">Pilih Hak Akses (Role)</label>
+                                     <select value={newUserReg.role} onChange={e => setNewUserReg({...newUserReg, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white cursor-pointer font-bold text-slate-700">
+                                        <option value="petugas">Petugas (Peta Saja)</option>
+                                        <option value="admin">Admin (Akses Penuh)</option>
+                                     </select>
+                                  </div>
+                                  <button type="submit" disabled={isCreatingUser} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-colors flex justify-center items-center gap-2 mt-2 disabled:opacity-70">
+                                     {isCreatingUser ? <Loader2 className="w-4 h-4 animate-spin"/> : "Daftarkan Akun"}
+                                  </button>
+                               </form>
+                            </div>
+
+                            <div className="md:col-span-2">
+                               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                  <table className="w-full text-left text-sm text-slate-600">
+                                     <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] font-bold border-b border-slate-200 tracking-wider">
+                                        <tr>
+                                           <th className="px-5 py-3">Alamat Email</th>
+                                           <th className="px-5 py-3">Hak Akses (Role)</th>
+                                           <th className="px-5 py-3">Tanggal Dibuat</th>
+                                           <th className="px-5 py-3 text-center">Aksi</th>
+                                        </tr>
+                                     </thead>
+                                     <tbody className="divide-y divide-slate-100">
+                                        {systemUsers.length === 0 ? (
+                                           <tr><td colSpan="4" className="px-5 py-8 text-center text-slate-400 italic">Memuat daftar akun terdaftar...</td></tr>
+                                        ) : systemUsers.map((usr, i) => (
+                                           <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                              <td className="px-5 py-4 font-bold text-slate-800 flex items-center gap-2">
+                                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white ${usr.role === 'admin' ? 'bg-purple-600' : 'bg-slate-500'}`}>{usr.email.charAt(0).toUpperCase()}</div>
+                                                 {usr.email}
+                                                 {usr.email === appUser.email && <span className="ml-2 text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-extrabold border border-blue-200">ANDA</span>}
+                                              </td>
+                                              <td className="px-5 py-4">
+                                                 <span className={`px-2 py-1 rounded text-[10px] font-extrabold tracking-wider ${usr.role === 'admin' ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>{usr.role.toUpperCase()}</span>
+                                              </td>
+                                              <td className="px-5 py-4 text-xs text-slate-500 font-mono">
+                                                 {usr.createdAt ? new Date(usr.createdAt).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'}) : 'Akun Lama'}
+                                              </td>
+                                              <td className="px-5 py-4 text-center">
+                                                 {usr.email !== appUser.email ? (
+                                                    <button onClick={() => handleDeleteUser(usr.email)} className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold border border-red-200 transition-colors shadow-sm">Cabut Akses</button>
+                                                 ) : (
+                                                    <span className="text-[10px] text-slate-400 italic">Tidak bisa hapus diri sendiri</span>
+                                                 )}
+                                              </td>
+                                           </tr>
+                                        ))}
+                                     </tbody>
+                                  </table>
+                               </div>
+                            </div>
+
+                         </div>
+                      </div>
+                   </div>
                 )}
 
                 {activeMenu === 'peta' && (
