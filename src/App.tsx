@@ -65,12 +65,12 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
   appId: "1:1065543308691:web:46ae59e9dd9f92a3f60466"
 };
 
-// Inisialisasi App Utama
+// Inisialisasi App Utama (Untuk Login & Database)
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Inisialisasi App Kedua (KHUSUS untuk bikin akun baru)
+// Inisialisasi App Kedua (KHUSUS untuk bikin akun baru tanpa logout otomatis)
 const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
 const secondaryAuth = getAuth(secondaryApp);
 
@@ -104,7 +104,9 @@ export default function App() {
     const iconUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}`;
     let link = document.querySelector("link[rel~='icon']");
     if (!link) {
-      link = document.createElement('link'); link.rel = 'icon'; document.getElementsByTagName('head')[0].appendChild(link);
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.getElementsByTagName('head')[0].appendChild(link);
     }
     link.href = iconUrl;
   }, []);
@@ -131,7 +133,8 @@ export default function App() {
   const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
 
   const showToast = (message, type = 'info') => {
-    setToast({ show: true, message, type }); setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
   };
 
   const requestConfirm = (message, actionFn) => {
@@ -141,10 +144,12 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
+      
       if (currentUser && currentUser.email) {
         try {
           const roleDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', currentUser.email.toLowerCase());
           const roleSnap = await getDoc(roleDocRef);
+          
           let determinedRole = 'petugas';
           
           if (roleSnap.exists()) {
@@ -160,24 +165,29 @@ export default function App() {
           
           setAppUser({ email: currentUser.email, role: determinedRole });
           setUserRole(determinedRole);
-          if (determinedRole === 'admin') setActiveMenu('dashboard'); else setActiveMenu('peta');
+          if (determinedRole === 'admin') setActiveMenu('dashboard');
+          else setActiveMenu('peta');
 
         } catch (error) { showToast("Terjadi kesalahan saat memuat hak akses.", "error"); }
       } else {
-        setAppUser(null); setUserRole(null);
+        setAppUser(null);
+        setUserRole(null);
       }
       setIsAuthChecking(false);
     });
+
     return () => unsubscribe();
   }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) return showToast("Email dan Password wajib diisi.", "error");
+    
     setIsLoggingIn(true);
     try {
       await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
-      showToast("Berhasil masuk ke sistem!", "success"); setLoginPassword('');
+      showToast("Berhasil masuk ke sistem!", "success");
+      setLoginPassword('');
     } catch (error) {
       let errMsg = "Email atau password salah.";
       if (error.code === 'auth/user-not-found') errMsg = "Akun tidak ditemukan.";
@@ -190,12 +200,17 @@ export default function App() {
 
   const handleLogout = async () => {
     requestConfirm("Anda yakin ingin keluar dari sistem aplikasi?", async () => {
-      await signOut(auth); showToast("Sesi telah diakhiri. Berhasil keluar.", "info");
+      await signOut(auth);
+      showToast("Sesi telah diakhiri. Berhasil keluar.", "info");
     });
   };
 
   useEffect(() => {
-    if (!firebaseUser || !appUser) { setMerchants([]); setSystemUsers([]); return; }
+    if (!firebaseUser || !appUser) {
+      setMerchants([]);
+      setSystemUsers([]);
+      return;
+    }
     setIsDbLoading(true);
     
     const merchantsRef = collection(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan');
@@ -320,25 +335,36 @@ export default function App() {
 
   useEffect(() => {
     if (activeMenu === 'peta' && isLeafletLoaded) {
-      if (!mapRef.current) {
-         const ragunanBounds = window.L.latLngBounds([ [-6.325000, 106.810000], [-6.295000, 106.835000] ]);
-         mapRef.current = window.L.map('ragunan-map', { zoomControl: false, maxBounds: ragunanBounds, maxBoundsViscosity: 1.0, minZoom: 15 }).setView([-6.311545, 106.820067], 16);
-         window.L.control.zoom({ position: 'bottomleft' }).addTo(mapRef.current);
-         const tileOptions = { maxZoom: 21, minZoom: 15, keepBuffer: 4, updateWhenIdle: true, updateWhenZooming: false };
-         const mapStandard = window.L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { ...tileOptions, attribution: '© Google Maps' });
-         const mapSatelit = window.L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { ...tileOptions, attribution: '© Google Maps (Satelit)' });
-         mapStandard.addTo(mapRef.current);
-         window.L.control.layers({ "🗺️ Peta Standar": mapStandard, "🌍 Satelit": mapSatelit }, null, { position: 'bottomright' }).addTo(mapRef.current);
-      }
+      // Delay sedikit agar React selesai render DOM 
+      const initTimeout = setTimeout(() => {
+        if (!mapRef.current && document.getElementById('ragunan-map')) {
+           const ragunanBounds = window.L.latLngBounds([ [-6.325000, 106.810000], [-6.295000, 106.835000] ]);
+           mapRef.current = window.L.map('ragunan-map', { zoomControl: false, maxBounds: ragunanBounds, maxBoundsViscosity: 1.0, minZoom: 15 }).setView([-6.311545, 106.820067], 16);
+           window.L.control.zoom({ position: 'bottomleft' }).addTo(mapRef.current);
+           const tileOptions = { maxZoom: 21, minZoom: 15, keepBuffer: 4, updateWhenIdle: true, updateWhenZooming: false };
+           const mapStandard = window.L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { ...tileOptions, attribution: '© Google Maps' });
+           const mapSatelit = window.L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { ...tileOptions, attribution: '© Google Maps (Satelit)' });
+           mapStandard.addTo(mapRef.current);
+           window.L.control.layers({ "🗺️ Peta Standar": mapStandard, "🌍 Satelit": mapSatelit }, null, { position: 'bottomright' }).addTo(mapRef.current);
+           
+           // Invalidate size untuk mencegah map blank abu-abu saat awal load di Admin
+           setTimeout(() => { if(mapRef.current) mapRef.current.invalidateSize(); }, 400);
+        }
+      }, 100);
+      return () => clearTimeout(initTimeout);
     } else {
       if (mapRef.current) {
          if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
-         setIsTrackingLocation(false); mapRef.current.remove(); mapRef.current = null; userMarkerRef.current = null; setSelectedMapMerchant(null);
+         setIsTrackingLocation(false); 
+         mapRef.current.remove(); 
+         mapRef.current = null; 
+         userMarkerRef.current = null; 
+         setSelectedMapMerchant(null);
       }
     }
   }, [activeMenu, isLeafletLoaded]);
 
-  // RENDER PINS (DIOPTIMASI AGAR TIDAK LAG & TIDAK CLASH)
+  // RENDER PINS (DIOPTIMASI AGAR TIDAK LAG)
   useEffect(() => {
     if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
     
@@ -355,7 +381,6 @@ export default function App() {
           const customIcon = window.L.divIcon({ html: iconHtml, className: '', iconSize: [14, 14], iconAnchor: [7, 7] });
           const marker = window.L.marker([m.lat, m.lng], { icon: customIcon }).addTo(mapRef.current);
           
-          // MENGGUNAKAN EVENT CLICK KE STATE REACT (TIDAK MEMBEBANI DOM DENGAN POPUP HTML)
           marker.on('click', () => {
             setSelectedMapMerchant(m);
             mapRef.current.setView([m.lat, m.lng], mapRef.current.getZoom(), { animate: true, duration: 0.5 });
@@ -462,7 +487,9 @@ export default function App() {
 
       setSpecialDates(newSpecialDates); 
       showToast(`Sinkronisasi sukses! ${added} hari libur ditambahkan.`, "success");
-    } catch (error) { showToast(`API Offline. Menggunakan data kalender internal.`, "error"); }
+    } catch (error) { 
+      showToast(`API Offline. Menggunakan data kalender internal.`, "error"); 
+    }
     setIsSyncing(false);
   };
 
@@ -846,9 +873,9 @@ export default function App() {
                 </div>
               </header>
 
-              {/* AREA UTAMA (PENYEBAB DUPLIKASI KODE YANG SEKARANG SUDAH DIBERSIHKAN) */}
               <main id="main-scroll-area" className="flex-1 overflow-y-auto p-4 lg:p-8 bg-slate-50/50 scroll-smooth relative">
                 
+                {/* 1. KONTEN DASHBOARD ADMIN */}
                 {userRole === 'admin' && activeMenu === 'dashboard' && (
                   <div className="max-w-7xl mx-auto space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -995,87 +1022,7 @@ export default function App() {
                   </div>
                 )}
 
-                {userRole === 'admin' && activeMenu === 'manajemen-akun' && (
-                   <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in">
-                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                         <div className="flex items-center gap-4 mb-6 border-b border-slate-100 pb-4">
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0"><UserCog className="w-6 h-6 text-blue-600" /></div>
-                            <div>
-                              <h2 className="text-xl font-bold text-slate-800">Manajemen Akun Sistem</h2>
-                              <p className="text-slate-500 text-sm mt-1">Daftarkan akun email petugas baru atau cabut akses akun lama secara langsung ke Firebase Auth.</p>
-                            </div>
-                         </div>
-
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="md:col-span-1 bg-slate-50 p-5 rounded-xl border border-slate-200 h-fit">
-                               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><UserPlus className="w-4 h-4 text-emerald-600"/> Daftarkan Akun Baru</h3>
-                               <form onSubmit={handleRegisterUser} className="space-y-4">
-                                  <div>
-                                     <label className="block text-xs font-bold text-slate-600 mb-1">Email Pendaftaran</label>
-                                     <input type="email" required value={newUserReg.email} onChange={e => setNewUserReg({...newUserReg, email: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white" placeholder="petugas@ragunan.com"/>
-                                  </div>
-                                  <div>
-                                     <label className="block text-xs font-bold text-slate-600 mb-1">Password Awal (Min 6 Karakter)</label>
-                                     <input type="password" required value={newUserReg.password} onChange={e => setNewUserReg({...newUserReg, password: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white" placeholder="••••••••"/>
-                                  </div>
-                                  <div>
-                                     <label className="block text-xs font-bold text-slate-600 mb-1">Pilih Hak Akses (Role)</label>
-                                     <select value={newUserReg.role} onChange={e => setNewUserReg({...newUserReg, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white cursor-pointer font-bold text-slate-700">
-                                        <option value="petugas">Petugas Lapangan</option>
-                                        <option value="admin">Admin (Akses Penuh)</option>
-                                     </select>
-                                  </div>
-                                  <button type="submit" disabled={isCreatingUser} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-colors flex justify-center items-center gap-2 mt-2 disabled:opacity-70">
-                                     {isCreatingUser ? <Loader2 className="w-4 h-4 animate-spin"/> : "Daftarkan Akun"}
-                                  </button>
-                               </form>
-                            </div>
-
-                            <div className="md:col-span-2">
-                               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                  <table className="w-full text-left text-sm text-slate-600">
-                                     <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] font-bold border-b border-slate-200 tracking-wider">
-                                        <tr>
-                                           <th className="px-5 py-3">Alamat Email</th>
-                                           <th className="px-5 py-3">Hak Akses (Role)</th>
-                                           <th className="px-5 py-3">Tanggal Dibuat</th>
-                                           <th className="px-5 py-3 text-center">Aksi</th>
-                                        </tr>
-                                     </thead>
-                                     <tbody className="divide-y divide-slate-100">
-                                        {systemUsers.length === 0 ? (
-                                           <tr><td colSpan="4" className="px-5 py-8 text-center text-slate-400 italic">Memuat daftar akun terdaftar...</td></tr>
-                                        ) : systemUsers.map((usr, i) => (
-                                           <tr key={i} className="hover:bg-slate-50 transition-colors">
-                                              <td className="px-5 py-4 font-bold text-slate-800 flex items-center gap-2">
-                                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white ${usr.role === 'admin' ? 'bg-purple-600' : 'bg-slate-500'}`}>{usr.email.charAt(0).toUpperCase()}</div>
-                                                 {usr.email}
-                                                 {usr.email === appUser.email && <span className="ml-2 text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-extrabold border border-blue-200">ANDA</span>}
-                                              </td>
-                                              <td className="px-5 py-4">
-                                                 <span className={`px-2 py-1 rounded text-[10px] font-extrabold tracking-wider ${usr.role === 'admin' ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>{usr.role.toUpperCase()}</span>
-                                              </td>
-                                              <td className="px-5 py-4 text-xs text-slate-500 font-mono">
-                                                 {usr.createdAt ? new Date(usr.createdAt).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'}) : 'Akun Lama'}
-                                              </td>
-                                              <td className="px-5 py-4 text-center">
-                                                 {usr.email !== appUser.email ? (
-                                                    <button onClick={() => handleDeleteUser(usr.email)} className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold border border-red-200 transition-colors shadow-sm">Cabut Akses</button>
-                                                 ) : (
-                                                    <span className="text-[10px] text-slate-400 italic">Tidak bisa hapus diri</span>
-                                                 )}
-                                              </td>
-                                           </tr>
-                                        ))}
-                                     </tbody>
-                                  </table>
-                               </div>
-                            </div>
-                         </div>
-                      </div>
-                   </div>
-                )}
-
+                {/* 2. KONTEN PETA */}
                 {activeMenu === 'peta' && (
                   <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-8rem)] animate-in fade-in relative">
                     <div className="w-full h-[55vh] lg:h-auto lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
@@ -1139,6 +1086,7 @@ export default function App() {
                           </div>
                        )}
 
+                       {/* ELEMENT INI TIDAK BOLEH GANDA */}
                        <div id="ragunan-map" className="w-full h-full z-0"></div>
                        
                        {!isLeafletLoaded && (
@@ -1226,6 +1174,7 @@ export default function App() {
                   </div>
                 )}
 
+                {/* 3. KELOLA DATA MASTERS */}
                 {activeMenu === 'kelola-data' && (
                   <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between gap-6 items-center">
@@ -1357,6 +1306,7 @@ export default function App() {
                   </div>
                 )}
 
+                {/* 4. SETTING KALENDER */}
                 {userRole === 'admin' && activeMenu === 'kalender' && (
                   <div className="max-w-6xl mx-auto space-y-6">
                     <div className="flex flex-col xl:flex-row gap-6">
@@ -1462,6 +1412,7 @@ export default function App() {
                   </div>
                 )}
 
+                {/* 5. GENERATE EXCEL */}
                 {userRole === 'admin' && activeMenu === 'generate' && (
                   <div className="max-w-4xl mx-auto space-y-6">
                     <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200">
@@ -1507,6 +1458,7 @@ export default function App() {
                   </div>
                 )}
 
+                {/* 6. REKON LAPORAN */}
                 {userRole === 'admin' && activeMenu === 'rekon' && (
                   <div className="max-w-4xl mx-auto space-y-6">
                     <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200">
@@ -1538,10 +1490,95 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                {/* 7. MANAJEMEN AKUN ADMIN */}
+                {userRole === 'admin' && activeMenu === 'manajemen-akun' && (
+                   <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in">
+                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                         <div className="flex items-center gap-4 mb-6 border-b border-slate-100 pb-4">
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center shrink-0"><UserCog className="w-6 h-6 text-blue-600" /></div>
+                            <div>
+                              <h2 className="text-xl font-bold text-slate-800">Manajemen Akun Sistem</h2>
+                              <p className="text-slate-500 text-sm mt-1">Daftarkan akun email petugas baru atau cabut akses akun lama secara langsung ke Firebase Auth.</p>
+                            </div>
+                         </div>
+
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            
+                            <div className="md:col-span-1 bg-slate-50 p-5 rounded-xl border border-slate-200 h-fit">
+                               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><UserPlus className="w-4 h-4 text-emerald-600"/> Daftarkan Akun Baru</h3>
+                               <form onSubmit={handleRegisterUser} className="space-y-4">
+                                  <div>
+                                     <label className="block text-xs font-bold text-slate-600 mb-1">Email Pendaftaran</label>
+                                     <input type="email" required value={newUserReg.email} onChange={e => setNewUserReg({...newUserReg, email: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white" placeholder="petugas@ragunan.com"/>
+                                  </div>
+                                  <div>
+                                     <label className="block text-xs font-bold text-slate-600 mb-1">Password Awal (Min 6 Karakter)</label>
+                                     <input type="password" required value={newUserReg.password} onChange={e => setNewUserReg({...newUserReg, password: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white" placeholder="••••••••"/>
+                                  </div>
+                                  <div>
+                                     <label className="block text-xs font-bold text-slate-600 mb-1">Pilih Hak Akses (Role)</label>
+                                     <select value={newUserReg.role} onChange={e => setNewUserReg({...newUserReg, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white cursor-pointer font-bold text-slate-700">
+                                        <option value="petugas">Petugas Lapangan</option>
+                                        <option value="admin">Admin (Akses Penuh)</option>
+                                     </select>
+                                  </div>
+                                  <button type="submit" disabled={isCreatingUser} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-lg shadow-md transition-colors flex justify-center items-center gap-2 mt-2 disabled:opacity-70">
+                                     {isCreatingUser ? <Loader2 className="w-4 h-4 animate-spin"/> : "Daftarkan Akun"}
+                                  </button>
+                               </form>
+                            </div>
+
+                            <div className="md:col-span-2">
+                               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                  <table className="w-full text-left text-sm text-slate-600">
+                                     <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] font-bold border-b border-slate-200 tracking-wider">
+                                        <tr>
+                                           <th className="px-5 py-3">Alamat Email</th>
+                                           <th className="px-5 py-3">Hak Akses (Role)</th>
+                                           <th className="px-5 py-3">Tanggal Dibuat</th>
+                                           <th className="px-5 py-3 text-center">Aksi</th>
+                                        </tr>
+                                     </thead>
+                                     <tbody className="divide-y divide-slate-100">
+                                        {systemUsers.length === 0 ? (
+                                           <tr><td colSpan="4" className="px-5 py-8 text-center text-slate-400 italic">Memuat daftar akun terdaftar...</td></tr>
+                                        ) : systemUsers.map((usr, i) => (
+                                           <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                              <td className="px-5 py-4 font-bold text-slate-800 flex items-center gap-2">
+                                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white ${usr.role === 'admin' ? 'bg-purple-600' : 'bg-slate-500'}`}>{usr.email.charAt(0).toUpperCase()}</div>
+                                                 {usr.email}
+                                                 {usr.email === appUser.email && <span className="ml-2 text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-extrabold border border-blue-200">ANDA</span>}
+                                              </td>
+                                              <td className="px-5 py-4">
+                                                 <span className={`px-2 py-1 rounded text-[10px] font-extrabold tracking-wider ${usr.role === 'admin' ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>{usr.role.toUpperCase()}</span>
+                                              </td>
+                                              <td className="px-5 py-4 text-xs text-slate-500 font-mono">
+                                                 {usr.createdAt ? new Date(usr.createdAt).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'}) : 'Akun Lama'}
+                                              </td>
+                                              <td className="px-5 py-4 text-center">
+                                                 {usr.email !== appUser.email ? (
+                                                    <button onClick={() => handleDeleteUser(usr.email)} className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold border border-red-200 transition-colors shadow-sm">Cabut Akses</button>
+                                                 ) : (
+                                                    <span className="text-[10px] text-slate-400 italic">Tidak bisa hapus diri</span>
+                                                 )}
+                                              </td>
+                                           </tr>
+                                        ))}
+                                     </tbody>
+                                  </table>
+                               </div>
+                            </div>
+
+                         </div>
+                      </div>
+                   </div>
+                )}
+
               </main>
             </div>
 
-            {/* MODAL HISTORI TAGIHAN */}
+            {/* MODAL HISTORI TAGIHAN (DIBUAT BARU SESUAI PERMINTAAN) */}
             {selectedMerchant && (
                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
                   <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl flex flex-col max-h-[85vh] animate-in zoom-in-95">
