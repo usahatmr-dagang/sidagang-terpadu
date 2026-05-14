@@ -65,7 +65,7 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
   appId: "1:1065543308691:web:46ae59e9dd9f92a3f60466"
 };
 
-// Inisialisasi App Utama
+// Inisialisasi App Utama (Untuk Login & Database)
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -103,7 +103,11 @@ export default function App() {
     `;
     const iconUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}`;
     let link = document.querySelector("link[rel~='icon']");
-    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.getElementsByTagName('head')[0].appendChild(link); }
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.getElementsByTagName('head')[0].appendChild(link);
+    }
     link.href = iconUrl;
   }, []);
 
@@ -140,10 +144,12 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
+      
       if (currentUser && currentUser.email) {
         try {
           const roleDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', currentUser.email.toLowerCase());
           const roleSnap = await getDoc(roleDocRef);
+          
           let determinedRole = 'petugas';
           
           if (roleSnap.exists()) {
@@ -164,42 +170,19 @@ export default function App() {
 
         } catch (error) { showToast("Terjadi kesalahan saat memuat hak akses.", "error"); }
       } else {
-        setAppUser(null); setUserRole(null);
+        setAppUser(null);
+        setUserRole(null);
       }
       setIsAuthChecking(false);
     });
+
     return () => unsubscribe();
   }, []);
-
-  // === FITUR AUTO LOGOUT JIKA LAMA NON-AKTIF ===
-  useEffect(() => {
-    if (!appUser) return;
-    
-    let inactivityTimeout;
-    const INACTIVITY_TIME_LIMIT = 15 * 60 * 1000; // 15 Menit dalam milidetik
-
-    const resetInactivityTimer = () => {
-      clearTimeout(inactivityTimeout);
-      inactivityTimeout = setTimeout(async () => {
-        await signOut(auth);
-        showToast("Sesi Anda berakhir karena sudah lama tidak ada aktivitas (Auto Logout).", "info");
-      }, INACTIVITY_TIME_LIMIT);
-    };
-
-    // Dengarkan aktivitas di seluruh window
-    const events = ['mousemove', 'mousedown', 'keypress', 'touchmove', 'scroll'];
-    events.forEach(event => window.addEventListener(event, resetInactivityTimer));
-    resetInactivityTimer(); // Inisialisasi awal
-
-    return () => {
-      clearTimeout(inactivityTimeout);
-      events.forEach(event => window.removeEventListener(event, resetInactivityTimer));
-    };
-  }, [appUser]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) return showToast("Email dan Password wajib diisi.", "error");
+    
     setIsLoggingIn(true);
     try {
       await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
@@ -223,7 +206,11 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!firebaseUser || !appUser) { setMerchants([]); setSystemUsers([]); return; }
+    if (!firebaseUser || !appUser) {
+      setMerchants([]);
+      setSystemUsers([]);
+      return;
+    }
     setIsDbLoading(true);
     
     const merchantsRef = collection(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan');
@@ -236,11 +223,9 @@ export default function App() {
     if (appUser.role === 'admin') {
        const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'user_roles');
        unsubUsers = onSnapshot(usersRef, (snapshot) => {
-          const uData = []; snapshot.forEach(doc => uData.push(doc.data()));
-          setSystemUsers(uData);
+          const uData = []; snapshot.forEach(doc => uData.push(doc.data())); setSystemUsers(uData);
        });
     }
-
     return () => { unsubMerchants(); unsubUsers(); };
   }, [firebaseUser, appUser]);
 
@@ -278,7 +263,7 @@ export default function App() {
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [isTrackingLocation, setIsTrackingLocation] = useState(false);
   const [isFetchingGps, setIsFetchingGps] = useState(false);
-  const [selectedMapMerchant, setSelectedMapMerchant] = useState(null); // State baru untuk overlay klik peta
+  const [selectedMapMerchant, setSelectedMapMerchant] = useState(null);
 
   const [formGenerate, setFormGenerate] = useState({
     kategoriExport: 'Semua', periode: `${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`, keterangan3: 'MAKANAN/MINUMAN',
@@ -298,8 +283,7 @@ export default function App() {
           const canvas = document.createElement('canvas'); const MAX_WIDTH = 600; const MAX_HEIGHT = 600;
           let width = img.width; let height = img.height;
           if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
-          canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.6));
+          canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/jpeg', 0.6));
         };
       }; reader.onerror = (error) => reject(error);
     });
@@ -337,8 +321,7 @@ export default function App() {
   };
 
   const handleDeleteUser = (emailTarget) => {
-     if (userRole !== 'admin') return;
-     if (emailTarget === appUser.email) return showToast("Anda tidak bisa menghapus akun Anda sendiri.", "error");
+     if (userRole !== 'admin') return; if (emailTarget === appUser.email) return showToast("Anda tidak bisa menghapus akun Anda sendiri.", "error");
      requestConfirm(`Anda yakin ingin mencabut hak akses akun ${emailTarget}? (Akun tidak bisa login ke app ini lagi)`, async () => {
         try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', emailTarget)); showToast("Hak akses akun berhasil dicabut.", "success"); } catch (error) { showToast("Gagal menghapus akun.", "error"); }
      });
@@ -370,11 +353,10 @@ export default function App() {
     }
   }, [activeMenu, isLeafletLoaded]);
 
-  // RENDER PINS (Dioptimalkan agar tidak bikin lag/hang)
+  // RENDER PINS (DIOPTIMASI AGAR TIDAK LAG)
   useEffect(() => {
     if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
     
-    // Gunakan timeout ringan agar tidak freeze UI saat berpindah tab ke Peta
     const renderTimeout = setTimeout(() => {
       Object.values(markersRef.current).forEach(m => m.remove());
       markersRef.current = {};
@@ -382,22 +364,22 @@ export default function App() {
       merchants.forEach(m => {
         if (m.lat && m.lng && (selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')))) {
           const isNunggak = m.totalTunggakan > 0;
-          const hasPhotoClass = m.fotoLapak ? 'ring-2 ring-blue-500' : 'border border-white';
-          // Optimasi: Hapus efek animate-ping agar GPU HP/PC tidak terbebani secara massal
-          const iconHtml = `<div class="relative flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full shadow-md ${isNunggak ? 'bg-red-500' : 'bg-emerald-500'} ${hasPhotoClass} transition-transform hover:scale-125 hover:z-50 cursor-pointer"></div>`;
-          const customIcon = window.L.divIcon({ html: iconHtml, className: '', iconSize: [20, 20], iconAnchor: [10, 10] });
+          
+          // MENGGUNAKAN ELEMEN HTML YANG SANGAT RINGAN TANPA ANIMASI PING
+          const iconHtml = `<div style="width:14px; height:14px; border-radius:50%; background-color:${isNunggak ? '#ef4444' : '#10b981'}; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); cursor: pointer;"></div>`;
+          const customIcon = window.L.divIcon({ html: iconHtml, className: '', iconSize: [14, 14], iconAnchor: [7, 7] });
           const marker = window.L.marker([m.lat, m.lng], { icon: customIcon }).addTo(mapRef.current);
           
-          // Mengganti bindPopup yang berat dengan Click event khusus ke komponen UI React 
+          // MENGGUNAKAN EVENT CLICK KE STATE REACT (TIDAK MEMBEBANI DOM DENGAN POPUP HTML)
           marker.on('click', () => {
-             setSelectedMapMerchant(m);
-             mapRef.current.setView([m.lat, m.lng], mapRef.current.getZoom());
+            setSelectedMapMerchant(m);
+            mapRef.current.setView([m.lat, m.lng], mapRef.current.getZoom(), { animate: true, duration: 0.5 });
           });
 
           markersRef.current[m.uid] = marker;
         }
       });
-    }, 100);
+    }, 150); // Mencegah freeze saat berpindah menu dengan debouncing
 
     return () => clearTimeout(renderTimeout);
   }, [merchants, activeMenu, isLeafletLoaded, selectedZone]);
@@ -462,15 +444,50 @@ export default function App() {
     setSpecialDates(newDates); setCalendarModal({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' }); showToast("Jadwal kalender berhasil diperbarui.", "success");
   };
 
+  // MULTIPLE API FAILOVER SYSTEM UNTUK HARI LIBUR
   const handleSyncHolidays = async () => {
     if (userRole !== 'admin') return;
     setIsSyncing(true);
     try {
-      const response = await fetch(`https://api.allorigins.win/raw?url=https://dayoffapi.vercel.app/api?year=${calYear}`);
-      if (!response.ok) throw new Error('API failed'); const data = await response.json(); const newSpecialDates = { ...specialDates }; let added = 0;
-      data.forEach(item => { if (item.tanggal && item.keterangan) { newSpecialDates[item.tanggal] = { type: 'LIBUR', name: item.is_cuti ? `Cuti Bersama: ${item.keterangan}` : item.keterangan }; added++; } });
-      setSpecialDates(newSpecialDates); showToast(`Sinkronisasi sukses! ${added} hari libur ditambahkan.`, "success");
-    } catch (error) { showToast(`API Offline. Menggunakan data kalender internal.`, "error"); }
+      let data = null;
+      
+      // Percobaan 1: Menggunakan API Harilibur (Paling Handal)
+      let response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
+      if (response && response.ok) data = await response.json();
+
+      // Percobaan 2: Jika gagal, gunakan DayoffAPI langsung
+      if (!data || data.length === 0) {
+        response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
+        if (response && response.ok) data = await response.json();
+      }
+
+      // Percobaan 3: DayoffAPI menggunakan Proxy untuk memotong error CORS
+      if (!data || data.length === 0) {
+        response = await fetch(`https://api.allorigins.win/raw?url=https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
+        if (response && response.ok) data = await response.json();
+      }
+      
+      if (!data || !Array.isArray(data)) throw new Error('Semua jalur API gagal.');
+
+      const newSpecialDates = { ...specialDates };
+      let added = 0;
+
+      // Memeriksa struktur objek (karena setiap API formatnya beda sedikit)
+      data.forEach(item => { 
+        const tgl = item.holiday_date || item.tanggal;
+        const ket = item.holiday_name || item.keterangan;
+        
+        if (tgl && ket) { 
+          newSpecialDates[tgl] = { type: 'LIBUR', name: ket }; 
+          added++; 
+        } 
+      });
+
+      setSpecialDates(newSpecialDates); 
+      showToast(`Sinkronisasi sukses! ${added} hari libur ditambahkan.`, "success");
+    } catch (error) { 
+      showToast(`API Offline. Menggunakan data kalender internal.`, "error"); 
+    }
     setIsSyncing(false);
   };
 
@@ -1741,7 +1758,7 @@ export default function App() {
               </div>
             )}
             
-            {/* Modal kalender & kelola tambah dibiarkan disembunyikan demi efisiensi render (opsional jika dibutuhkan tetap ada di state di atas) */}
+            {/* Modal kalender & kelola tambah dibiarkan disembunyikan demi efisiensi render */}
           </div>
         );
       })()}
