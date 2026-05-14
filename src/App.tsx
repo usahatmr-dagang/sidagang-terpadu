@@ -65,12 +65,12 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
   appId: "1:1065543308691:web:46ae59e9dd9f92a3f60466"
 };
 
-// Inisialisasi App Utama (Untuk Login & Database)
+// Inisialisasi App Utama
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Inisialisasi App Kedua (KHUSUS untuk bikin akun baru tanpa logout otomatis)
+// Inisialisasi App Kedua (KHUSUS untuk bikin akun baru)
 const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
 const secondaryAuth = getAuth(secondaryApp);
 
@@ -104,9 +104,7 @@ export default function App() {
     const iconUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}`;
     let link = document.querySelector("link[rel~='icon']");
     if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.getElementsByTagName('head')[0].appendChild(link);
+      link = document.createElement('link'); link.rel = 'icon'; document.getElementsByTagName('head')[0].appendChild(link);
     }
     link.href = iconUrl;
   }, []);
@@ -133,8 +131,7 @@ export default function App() {
   const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
 
   const showToast = (message, type = 'info') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
+    setToast({ show: true, message, type }); setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
   };
 
   const requestConfirm = (message, actionFn) => {
@@ -144,12 +141,10 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
-      
       if (currentUser && currentUser.email) {
         try {
           const roleDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', currentUser.email.toLowerCase());
           const roleSnap = await getDoc(roleDocRef);
-          
           let determinedRole = 'petugas';
           
           if (roleSnap.exists()) {
@@ -165,29 +160,24 @@ export default function App() {
           
           setAppUser({ email: currentUser.email, role: determinedRole });
           setUserRole(determinedRole);
-          if (determinedRole === 'admin') setActiveMenu('dashboard');
-          else setActiveMenu('peta');
+          if (determinedRole === 'admin') setActiveMenu('dashboard'); else setActiveMenu('peta');
 
         } catch (error) { showToast("Terjadi kesalahan saat memuat hak akses.", "error"); }
       } else {
-        setAppUser(null);
-        setUserRole(null);
+        setAppUser(null); setUserRole(null);
       }
       setIsAuthChecking(false);
     });
-
     return () => unsubscribe();
   }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) return showToast("Email dan Password wajib diisi.", "error");
-    
     setIsLoggingIn(true);
     try {
       await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
-      showToast("Berhasil masuk ke sistem!", "success");
-      setLoginPassword('');
+      showToast("Berhasil masuk ke sistem!", "success"); setLoginPassword('');
     } catch (error) {
       let errMsg = "Email atau password salah.";
       if (error.code === 'auth/user-not-found') errMsg = "Akun tidak ditemukan.";
@@ -200,17 +190,12 @@ export default function App() {
 
   const handleLogout = async () => {
     requestConfirm("Anda yakin ingin keluar dari sistem aplikasi?", async () => {
-      await signOut(auth);
-      showToast("Sesi telah diakhiri. Berhasil keluar.", "info");
+      await signOut(auth); showToast("Sesi telah diakhiri. Berhasil keluar.", "info");
     });
   };
 
   useEffect(() => {
-    if (!firebaseUser || !appUser) {
-      setMerchants([]);
-      setSystemUsers([]);
-      return;
-    }
+    if (!firebaseUser || !appUser) { setMerchants([]); setSystemUsers([]); return; }
     setIsDbLoading(true);
     
     const merchantsRef = collection(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan');
@@ -353,7 +338,7 @@ export default function App() {
     }
   }, [activeMenu, isLeafletLoaded]);
 
-  // RENDER PINS (DIOPTIMASI AGAR TIDAK LAG)
+  // RENDER PINS (DIOPTIMASI AGAR TIDAK LAG & TIDAK CLASH)
   useEffect(() => {
     if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
     
@@ -379,7 +364,7 @@ export default function App() {
           markersRef.current[m.uid] = marker;
         }
       });
-    }, 150); // Mencegah freeze saat berpindah menu dengan debouncing
+    }, 150);
 
     return () => clearTimeout(renderTimeout);
   }, [merchants, activeMenu, isLeafletLoaded, selectedZone]);
@@ -450,18 +435,14 @@ export default function App() {
     setIsSyncing(true);
     try {
       let data = null;
-      
-      // Percobaan 1: Menggunakan API Harilibur (Paling Handal)
       let response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
       if (response && response.ok) data = await response.json();
 
-      // Percobaan 2: Jika gagal, gunakan DayoffAPI langsung
       if (!data || data.length === 0) {
         response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
         if (response && response.ok) data = await response.json();
       }
 
-      // Percobaan 3: DayoffAPI menggunakan Proxy untuk memotong error CORS
       if (!data || data.length === 0) {
         response = await fetch(`https://api.allorigins.win/raw?url=https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
         if (response && response.ok) data = await response.json();
@@ -472,22 +453,16 @@ export default function App() {
       const newSpecialDates = { ...specialDates };
       let added = 0;
 
-      // Memeriksa struktur objek (karena setiap API formatnya beda sedikit)
       data.forEach(item => { 
         const tgl = item.holiday_date || item.tanggal;
         const ket = item.holiday_name || item.keterangan;
         
-        if (tgl && ket) { 
-          newSpecialDates[tgl] = { type: 'LIBUR', name: ket }; 
-          added++; 
-        } 
+        if (tgl && ket) { newSpecialDates[tgl] = { type: 'LIBUR', name: ket }; added++; } 
       });
 
       setSpecialDates(newSpecialDates); 
       showToast(`Sinkronisasi sukses! ${added} hari libur ditambahkan.`, "success");
-    } catch (error) { 
-      showToast(`API Offline. Menggunakan data kalender internal.`, "error"); 
-    }
+    } catch (error) { showToast(`API Offline. Menggunakan data kalender internal.`, "error"); }
     setIsSyncing(false);
   };
 
@@ -871,6 +846,7 @@ export default function App() {
                 </div>
               </header>
 
+              {/* AREA UTAMA (PENYEBAB DUPLIKASI KODE YANG SEKARANG SUDAH DIBERSIHKAN) */}
               <main id="main-scroll-area" className="flex-1 overflow-y-auto p-4 lg:p-8 bg-slate-50/50 scroll-smooth relative">
                 
                 {userRole === 'admin' && activeMenu === 'dashboard' && (
@@ -1031,7 +1007,6 @@ export default function App() {
                          </div>
 
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            
                             <div className="md:col-span-1 bg-slate-50 p-5 rounded-xl border border-slate-200 h-fit">
                                <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><UserPlus className="w-4 h-4 text-emerald-600"/> Daftarkan Akun Baru</h3>
                                <form onSubmit={handleRegisterUser} className="space-y-4">
@@ -1096,7 +1071,6 @@ export default function App() {
                                   </table>
                                </div>
                             </div>
-
                          </div>
                       </div>
                    </div>
@@ -1252,7 +1226,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* MODUL KELOLA DATA - TERBUKA UNTUK ADMIN DAN PETUGAS */}
                 {activeMenu === 'kelola-data' && (
                   <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between gap-6 items-center">
@@ -1261,7 +1234,6 @@ export default function App() {
                         <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">Sistem tersinkronisasi dengan <CloudDownload className="w-3.5 h-3.5 text-blue-500"/> Firebase Cloud.</p>
                       </div>
                       
-                      {/* AKSI TAMBAH/IMPORT HANYA UNTUK ADMIN */}
                       {userRole === 'admin' && (
                         <div className="flex flex-wrap gap-2 items-center">
                             <select value={importKategori} onChange={(e) => setImportKategori(e.target.value)} className="px-3 py-2.5 border border-slate-300 rounded-lg outline-none text-sm font-medium bg-slate-50 cursor-pointer">
@@ -1371,7 +1343,6 @@ export default function App() {
                                   <div className="flex flex-col gap-1.5">
                                     <button onClick={() => setEditModal({ isOpen: true, data: row })} className="p-1.5 flex items-center justify-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded-lg transition-colors text-[10px] font-bold"><Pencil className="w-3.5 h-3.5"/> Edit Data</button>
                                     
-                                    {/* HAPUS HANYA UNTUK ADMIN */}
                                     {userRole === 'admin' && (
                                       <button onClick={() => handleDeleteSatuan(row)} className="p-1.5 flex items-center justify-center gap-1.5 bg-red-50 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg transition-colors text-[10px] font-bold"><XCircle className="w-3.5 h-3.5"/> Hapus</button>
                                     )}
@@ -1570,9 +1541,9 @@ export default function App() {
               </main>
             </div>
 
-            {/* MODAL HISTORI TAGIHAN (DIBUAT BARU SESUAI PERMINTAAN) */}
+            {/* MODAL HISTORI TAGIHAN */}
             {selectedMerchant && (
-               <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+               <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
                   <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl flex flex-col max-h-[85vh] animate-in zoom-in-95">
                      <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl shrink-0">
                         <div>
@@ -1627,7 +1598,7 @@ export default function App() {
 
             {/* MODAL EDIT DATA (TERBUKA UNTUK ADMIN DAN PETUGAS) */}
             {editModal.isOpen && editModal.data && (
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
                 <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl shrink-0">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Pencil className="w-5 h-5 text-amber-500"/> Edit Data {userRole === 'petugas' && '(Mode Petugas)'}</h3>
@@ -1757,8 +1728,163 @@ export default function App() {
                 </div>
               </div>
             )}
-            
-            {/* Modal kalender & kelola tambah dibiarkan disembunyikan demi efisiensi render */}
+
+            {/* MODAL TAMBAH DATA BARU */}
+            {showAddModal && (
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+                <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
+                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl shrink-0">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><PlusCircle className="w-5 h-5 text-blue-600"/> Tambah Data Baru</h3>
+                    <button onClick={() => setShowAddModal(false)} className="p-1 hover:bg-slate-200 rounded-full transition-colors"><XCircle className="w-5 h-5 text-slate-400" /></button>
+                  </div>
+                  <form onSubmit={handleAddMerchantManual} className="p-6 overflow-y-auto space-y-4">
+                    <div className="p-4 rounded-xl border bg-blue-50/50 border-blue-100 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">ID Tagihan (Account ID) *</label>
+                          <input required type="text" value={newMerchant.accountId} onChange={e => setNewMerchant({ ...newMerchant, accountId: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white"/>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">Nama Pemilik / Pedagang *</label>
+                          <input required type="text" value={newMerchant.nama} onChange={e => setNewMerchant({ ...newMerchant, nama: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white"/>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">Kategori Sistem</label>
+                          <select value={newMerchant.kategori} onChange={e => {
+                              const kat = e.target.value; let tarif = 'HARIAN_FULL';
+                              if(kat === 'LOKSEM') tarif = 'HARIAN_FULL_NONSTOP'; if(kat === 'TIKAR') tarif = 'HARIAN_WEEKEND'; if(kat === 'LISTRIK') tarif = 'TETAP';
+                              setNewMerchant({ ...newMerchant, kategori: kat, tipeTarif: tarif });
+                            }} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm bg-white cursor-pointer">
+                            <option value="PKL">PKL Umum</option><option value="LOKSEM">Loksem</option>
+                            <option value="TIKAR">Tikar</option><option value="JURU FOTO">Juru Foto</option>
+                            <option value="LISTRIK">Tagihan Listrik</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">Tipe Tarif Awal</label>
+                          <select value={newMerchant.tipeTarif} onChange={e => setNewMerchant({ ...newMerchant, tipeTarif: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm bg-white cursor-pointer">
+                            <option value="HARIAN_FULL">Harian - Senin Tutup</option><option value="HARIAN_FULL_NONSTOP">Harian - Nonstop</option>
+                            <option value="HARIAN_WEEKEND">Weekend / Libur Saja</option><option value="TETAP">Bulanan Tetap / Listrik</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">Nomor KTP (NIK)</label>
+                          <input type="text" value={newMerchant.nik} onChange={e => setNewMerchant({ ...newMerchant, nik: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white" placeholder="16 Digit NIK"/>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">No. HP / WhatsApp</label>
+                          <input type="text" value={newMerchant.noHp} onChange={e => setNewMerchant({ ...newMerchant, noHp: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white" placeholder="0812..."/>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Alamat Rumah Tinggal</label>
+                        <textarea value={newMerchant.alamatRumah} onChange={e => setNewMerchant({ ...newMerchant, alamatRumah: e.target.value })} rows="2" className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white" placeholder="Alamat lengkap..."></textarea>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Lokasi Lapak</label>
+                        <input type="text" value={newMerchant.keterangan} onChange={e => setNewMerchant({ ...newMerchant, keterangan: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white"/>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">Jenis Dagangan</label>
+                        <input type="text" value={newMerchant.jenisUsaha} onChange={e => setNewMerchant({ ...newMerchant, jenisUsaha: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white"/>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">No. Rekening DKI</label>
+                        <input type="text" value={newMerchant.rekeningSumber} onChange={e => setNewMerchant({ ...newMerchant, rekeningSumber: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white"/>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
+                         <div className="flex justify-between items-center mb-3">
+                           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2"><Camera className="w-4 h-4"/> Foto Lapak</h4>
+                         </div>
+                         {!newMerchant.fotoLapak ? (
+                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-slate-50 transition-colors">
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                 {isCompressing ? <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" /> : <ImageIcon className="w-8 h-8 text-slate-400 mb-2" />}
+                                 <p className="text-xs text-slate-500 font-semibold">{isCompressing ? 'Mengkompres...' : 'Ketuk untuk Tambah Foto'}</p>
+                              </div>
+                              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, 'ADD')} disabled={isCompressing} />
+                            </label>
+                         ) : (
+                            <div className="relative w-full h-32 rounded-lg overflow-hidden border border-slate-300 shadow-sm group">
+                               <img src={newMerchant.fotoLapak} alt="Preview" className="w-full h-full object-cover" />
+                               <button type="button" onClick={() => hapusFoto('ADD')} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow hover:bg-red-600"><X className="w-4 h-4"/></button>
+                            </div>
+                         )}
+                      </div>
+
+                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex flex-col justify-between">
+                        <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-2 mb-2"><MapIcon className="w-4 h-4"/> Koordinat Map</h4>
+                        <button type="button" onClick={() => captureCurrentLocation('ADD')} disabled={isFetchingGps} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm mb-3">
+                          {isFetchingGps ? <Loader2 className="w-4 h-4 animate-spin"/> : <Crosshair className="w-4 h-4"/>} Lacak Live GPS
+                        </button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <input type="number" step="any" placeholder="Lat" value={newMerchant.lat} onChange={e => setNewMerchant({ ...newMerchant, lat: e.target.value })} className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs outline-none bg-white focus:ring-1 focus:ring-blue-500"/>
+                          </div>
+                          <div>
+                            <input type="number" step="any" placeholder="Lng" value={newMerchant.lng} onChange={e => setNewMerchant({ ...newMerchant, lng: e.target.value })} className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs outline-none bg-white focus:ring-1 focus:ring-blue-500"/>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 mt-4 flex justify-end gap-3 border-t border-slate-200">
+                      <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Batal</button>
+                      <button type="submit" className="px-5 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-md flex items-center gap-2"><CloudDownload className="w-4 h-4"/> Simpan ke Cloud</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL KALENDER */}
+            {calendarModal.isOpen && (
+               <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+                  <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl flex flex-col animate-in zoom-in-95">
+                     <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
+                        <h3 className="text-lg font-bold text-slate-800">Atur Hari Khusus</h3>
+                        <button onClick={() => setCalendarModal({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' })} className="p-1 hover:bg-slate-200 rounded-full transition-colors"><X className="w-5 h-5 text-slate-500" /></button>
+                     </div>
+                     <form onSubmit={saveCalendarDate} className="p-6 space-y-4">
+                        <div className="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm font-bold border border-blue-200 flex items-center gap-2">
+                           <CalendarDays className="w-5 h-5"/> Tanggal: {calendarModal.day} / {calMonth} / {calYear}
+                        </div>
+                        <div>
+                           <label className="block text-xs font-bold text-slate-600 mb-1">Status Hari Ini</label>
+                           <select value={calendarModal.type} onChange={e => setCalendarModal({ ...calendarModal, type: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm bg-white cursor-pointer focus:ring-2 focus:ring-blue-500">
+                              <option value="NORMAL">Hari Biasa / Normal</option>
+                              <option value="LIBUR">Libur Nasional / Cuti</option>
+                              <option value="PEAK">Peak Season / Ramai</option>
+                              <option value="TUTUP">Tutup Operasional / Tutup</option>
+                              <option value="BUKA">Buka Pengganti (Khusus Senin)</option>
+                           </select>
+                        </div>
+                        {calendarModal.type !== 'NORMAL' && (
+                           <div>
+                              <label className="block text-xs font-bold text-slate-600 mb-1">Nama Keterangan (Opsional)</label>
+                              <input type="text" value={calendarModal.name} onChange={e => setCalendarModal({ ...calendarModal, name: e.target.value })} placeholder="Cth: Libur Idul Fitri" className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm bg-white focus:ring-2 focus:ring-blue-500"/>
+                           </div>
+                        )}
+                        <div className="pt-2 flex justify-end gap-3">
+                           <button type="submit" className="w-full px-4 py-2.5 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-md">Simpan Perubahan</button>
+                        </div>
+                     </form>
+                  </div>
+               </div>
+            )}
           </div>
         );
       })()}
