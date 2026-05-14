@@ -238,6 +238,8 @@ export default function App() {
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1); 
   const [calYear, setCalYear] = useState(new Date().getFullYear()); 
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // STATE MODAL KALENDER HARUS TERDEKLARASI DENGAN BAIK
   const [calendarModal, setCalendarModal] = useState({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' });
 
   const [selectedZone, setSelectedZone] = useState('SEMUA AREA');
@@ -343,7 +345,7 @@ export default function App() {
     }
   }, [activeMenu, isLeafletLoaded]);
 
-  // RENDER PINS KE PETA (DIOPTIMASI)
+  // RENDER PINS KE PETA (DENGAN ANIMASI BIP-BIP)
   useEffect(() => {
     if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
     
@@ -469,45 +471,67 @@ export default function App() {
     if (calendarModal.type !== 'NORMAL' && !calendarModal.name) { return showToast("Nama event wajib diisi untuk hari khusus!", "error"); }
     const newDates = { ...specialDates };
     if (calendarModal.type === 'NORMAL') { delete newDates[calendarModal.dateStr]; } else { newDates[calendarModal.dateStr] = { type: calendarModal.type, name: calendarModal.name }; }
-    setSpecialDates(newDates); setCalendarModal({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' }); showToast("Jadwal kalender berhasil diperbarui.", "success");
+    setSpecialDates(newDates); 
+    setCalendarModal({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' }); 
+    showToast("Jadwal kalender berhasil diperbarui.", "success");
   };
 
-  // MULTIPLE API FAILOVER SYSTEM UNTUK HARI LIBUR & SKB 3 MENTERI
+  // MULTIPLE API FAILOVER SYSTEM UNTUK HARI LIBUR & SKB 3 MENTERI (DIPERBAIKI LOGIC FILTERNYA)
   const handleSyncHolidays = async () => {
     if (userRole !== 'admin') return;
     setIsSyncing(true);
     try {
       let data = null;
-      let response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
+      
+      // API 1: API Hari Libur
+      let response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
       if (response && response.ok) data = await response.json();
 
+      // API 2: DayOff API
       if (!data || data.length === 0) {
-        response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
+        response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
         if (response && response.ok) data = await response.json();
       }
       
+      // API 3: AllOrigins Proxy (Jika terblokir CORS)
+      if (!data || data.length === 0) {
+        response = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://dayoffapi.vercel.app/api?year='+calYear)}`).catch(() => null);
+        if (response && response.ok) data = await response.json();
+      }
+
       if (data && Array.isArray(data) && data.length > 0) {
          const newSpecialDates = { ...specialDates };
          let added = 0;
+         
          data.forEach(item => { 
+           // Menangani berbagai format key dari API yang berbeda
            const tgl = item.tanggal || item.holiday_date;
            const ket = item.keterangan || item.holiday_name;
-           const isLibur = item.is_cuti === true || item.is_national_holiday === true || typeof item.is_cuti === 'undefined';
            
-           if (tgl && ket && isLibur) { newSpecialDates[tgl] = { type: 'LIBUR', name: ket }; added++; } 
+           // PERBAIKAN UTAMA: Semua array yang dikembalikan dari API SKB ini pada dasarnya adalah 
+           // tanggal merah (baik Cuti Bersama maupun Libur Nasional). Tidak perlu difilter secara ketat lagi.
+           if (tgl && ket && String(tgl).startsWith(String(calYear))) { 
+               newSpecialDates[tgl] = { type: 'LIBUR', name: ket }; 
+               added++; 
+           } 
          });
-         setSpecialDates(newSpecialDates); 
-         showToast(`Sinkronisasi sukses! ${added} hari libur ditambahkan.`, "success");
+         
+         if (added > 0) {
+             setSpecialDates(newSpecialDates); 
+             showToast(`Sinkronisasi sukses! ${added} Hari Libur/Cuti Bersama ditambahkan dari Cloud SKB.`, "success");
+         } else {
+             throw new Error('Data API tidak memuat tahun yang dipilih.');
+         }
       } else {
          throw new Error('Semua jalur API kosong/gagal.');
       }
     } catch (error) { 
-      // FALLBACK SKB 2026 JIKA API MENGALAMI ERROR ATAU DOWN
+      // FALLBACK SKB 2026 OFFLINE JIKA API MENGALAMI ERROR ATAU DOWN
       const fallback2026 = {
          "2026-01-01": { type: "LIBUR", name: "Tahun Baru Masehi" },
          "2026-02-17": { type: "LIBUR", name: "Isra Mikraj" },
          "2026-03-03": { type: "LIBUR", name: "Hari Raya Nyepi" },
-         "2026-03-20": { type: "LIBUR", name: "Idul Fitri" },
+         "2026-03-20": { type: "LIBUR", name: "Cuti Bersama Idul Fitri" },
          "2026-03-21": { type: "LIBUR", name: "Idul Fitri" },
          "2026-04-03": { type: "LIBUR", name: "Wafat Isa Al Masih" },
          "2026-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
@@ -520,7 +544,7 @@ export default function App() {
          "2026-12-25": { type: "LIBUR", name: "Hari Raya Natal" }
       };
       setSpecialDates({...specialDates, ...fallback2026});
-      showToast(`API lambat/gagal. Menggunakan Data SKB Offline ${calYear}.`, "success"); 
+      showToast(`API Server Publik lambat. Menggunakan Data SKB Offline ${calYear}.`, "success"); 
     }
     setIsSyncing(false);
   };
