@@ -77,8 +77,8 @@ const secondaryAuth = getAuth(secondaryApp);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'ragunan-autodebet-app';
 
 const defaultHolidays = {
-  "2026-01-01": { type: "LIBUR", name: "Tahun Baru 2026" }, "2026-03-19": { type: "LIBUR", name: "Hari Suci Nyepi" },
-  "2026-03-21": { type: "LIBUR", name: "Idul Fitri" }, "2026-03-22": { type: "LIBUR", name: "Idul Fitri" },
+  "2026-01-01": { type: "LIBUR", name: "Tahun Baru Masehi" }, "2026-03-19": { type: "LIBUR", name: "Hari Suci Nyepi" },
+  "2026-03-20": { type: "LIBUR", name: "Idul Fitri" }, "2026-03-21": { type: "LIBUR", name: "Idul Fitri" },
   "2026-04-03": { type: "LIBUR", name: "Wafat Yesus Kristus" }, "2026-05-01": { type: "LIBUR", name: "Hari Buruh" },
   "2026-05-14": { type: "LIBUR", name: "Kenaikan Yesus Kristus" }, "2026-05-27": { type: "LIBUR", name: "Idul Adha" },
   "2026-08-17": { type: "LIBUR", name: "HUT RI" }, "2026-12-25": { type: "LIBUR", name: "Natal" }
@@ -104,9 +104,7 @@ export default function App() {
     const iconUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}`;
     let link = document.querySelector("link[rel~='icon']");
     if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.getElementsByTagName('head')[0].appendChild(link);
+      link = document.createElement('link'); link.rel = 'icon'; document.getElementsByTagName('head')[0].appendChild(link);
     }
     link.href = iconUrl;
   }, []);
@@ -133,8 +131,7 @@ export default function App() {
   const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
 
   const showToast = (message, type = 'info') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
+    setToast({ show: true, message, type }); setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 4000);
   };
 
   const requestConfirm = (message, actionFn) => {
@@ -144,12 +141,10 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
-      
       if (currentUser && currentUser.email) {
         try {
           const roleDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', currentUser.email.toLowerCase());
           const roleSnap = await getDoc(roleDocRef);
-          
           let determinedRole = 'petugas';
           
           if (roleSnap.exists()) {
@@ -165,29 +160,24 @@ export default function App() {
           
           setAppUser({ email: currentUser.email, role: determinedRole });
           setUserRole(determinedRole);
-          if (determinedRole === 'admin') setActiveMenu('dashboard');
-          else setActiveMenu('peta');
+          if (determinedRole === 'admin') setActiveMenu('dashboard'); else setActiveMenu('peta');
 
         } catch (error) { showToast("Terjadi kesalahan saat memuat hak akses.", "error"); }
       } else {
-        setAppUser(null);
-        setUserRole(null);
+        setAppUser(null); setUserRole(null);
       }
       setIsAuthChecking(false);
     });
-
     return () => unsubscribe();
   }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) return showToast("Email dan Password wajib diisi.", "error");
-    
     setIsLoggingIn(true);
     try {
       await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
-      showToast("Berhasil masuk ke sistem!", "success");
-      setLoginPassword('');
+      showToast("Berhasil masuk ke sistem!", "success"); setLoginPassword('');
     } catch (error) {
       let errMsg = "Email atau password salah.";
       if (error.code === 'auth/user-not-found') errMsg = "Akun tidak ditemukan.";
@@ -200,17 +190,12 @@ export default function App() {
 
   const handleLogout = async () => {
     requestConfirm("Anda yakin ingin keluar dari sistem aplikasi?", async () => {
-      await signOut(auth);
-      showToast("Sesi telah diakhiri. Berhasil keluar.", "info");
+      await signOut(auth); showToast("Sesi telah diakhiri. Berhasil keluar.", "info");
     });
   };
 
   useEffect(() => {
-    if (!firebaseUser || !appUser) {
-      setMerchants([]);
-      setSystemUsers([]);
-      return;
-    }
+    if (!firebaseUser || !appUser) { setMerchants([]); setSystemUsers([]); return; }
     setIsDbLoading(true);
     
     const merchantsRef = collection(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan');
@@ -333,9 +318,9 @@ export default function App() {
     if (window.L) { setIsLeafletLoaded(true); } else { const linkLeaflet = document.createElement('link'); linkLeaflet.rel = 'stylesheet'; linkLeaflet.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(linkLeaflet); const scriptLeaflet = document.createElement('script'); scriptLeaflet.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; scriptLeaflet.onload = () => setIsLeafletLoaded(true); document.body.appendChild(scriptLeaflet); }
   }, []);
 
+  // INIT LEAFLET MAP
   useEffect(() => {
     if (activeMenu === 'peta' && isLeafletLoaded) {
-      // Delay sedikit agar React selesai render DOM 
       const initTimeout = setTimeout(() => {
         if (!mapRef.current && document.getElementById('ragunan-map')) {
            const ragunanBounds = window.L.latLngBounds([ [-6.325000, 106.810000], [-6.295000, 106.835000] ]);
@@ -346,8 +331,6 @@ export default function App() {
            const mapSatelit = window.L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { ...tileOptions, attribution: '© Google Maps (Satelit)' });
            mapStandard.addTo(mapRef.current);
            window.L.control.layers({ "🗺️ Peta Standar": mapStandard, "🌍 Satelit": mapSatelit }, null, { position: 'bottomright' }).addTo(mapRef.current);
-           
-           // Invalidate size untuk mencegah map blank abu-abu saat awal load di Admin
            setTimeout(() => { if(mapRef.current) mapRef.current.invalidateSize(); }, 400);
         }
       }, 100);
@@ -355,16 +338,12 @@ export default function App() {
     } else {
       if (mapRef.current) {
          if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
-         setIsTrackingLocation(false); 
-         mapRef.current.remove(); 
-         mapRef.current = null; 
-         userMarkerRef.current = null; 
-         setSelectedMapMerchant(null);
+         setIsTrackingLocation(false); mapRef.current.remove(); mapRef.current = null; userMarkerRef.current = null; setSelectedMapMerchant(null);
       }
     }
   }, [activeMenu, isLeafletLoaded]);
 
-  // RENDER PINS (DIOPTIMASI AGAR TIDAK LAG)
+  // RENDER PINS KE PETA (DIOPTIMASI)
   useEffect(() => {
     if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
     
@@ -375,12 +354,22 @@ export default function App() {
       merchants.forEach(m => {
         if (m.lat && m.lng && (selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')))) {
           const isNunggak = m.totalTunggakan > 0;
+          const isSelected = selectedMapMerchant?.uid === m.uid;
           
-          // MENGGUNAKAN ELEMEN HTML YANG SANGAT RINGAN TANPA ANIMASI PING
-          const iconHtml = `<div style="width:14px; height:14px; border-radius:50%; background-color:${isNunggak ? '#ef4444' : '#10b981'}; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); cursor: pointer;"></div>`;
-          const customIcon = window.L.divIcon({ html: iconHtml, className: '', iconSize: [14, 14], iconAnchor: [7, 7] });
+          let iconHtml = '';
+          if (isSelected) {
+              iconHtml = `<div class="relative flex items-center justify-center w-5 h-5 rounded-full ${isNunggak ? 'bg-red-500' : 'bg-emerald-500'} border-2 border-white shadow-lg"><span class="absolute inset-0 rounded-full border-2 ${isNunggak ? 'border-red-400' : 'border-emerald-400'} animate-ping"></span></div>`;
+          } else {
+              iconHtml = `<div style="width:14px; height:14px; border-radius:50%; background-color:${isNunggak ? '#ef4444' : '#10b981'}; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>`;
+          }
+
+          const customIcon = window.L.divIcon({ html: iconHtml, className: '', iconSize: isSelected ? [20, 20] : [14, 14], iconAnchor: isSelected ? [10, 10] : [7, 7] });
           const marker = window.L.marker([m.lat, m.lng], { icon: customIcon }).addTo(mapRef.current);
           
+          marker.isNunggak = isNunggak;
+          marker.merchantUid = m.uid;
+          marker.isCurrentlySelected = isSelected;
+
           marker.on('click', () => {
             setSelectedMapMerchant(m);
             mapRef.current.setView([m.lat, m.lng], mapRef.current.getZoom(), { animate: true, duration: 0.5 });
@@ -393,6 +382,35 @@ export default function App() {
 
     return () => clearTimeout(renderTimeout);
   }, [merchants, activeMenu, isLeafletLoaded, selectedZone]);
+
+  // EFFECT UNTUK UPDATE PIN "BIP-BIP" KETIKA DIPILIH DARI DAFTAR ATAU PETA
+  useEffect(() => {
+     if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
+
+     Object.values(markersRef.current).forEach(marker => {
+         const mUid = marker.merchantUid;
+         const isNunggak = marker.isNunggak;
+         const isSelected = selectedMapMerchant && selectedMapMerchant.uid === mUid;
+
+         if (isSelected && !marker.isCurrentlySelected) {
+             const selectedIcon = window.L.divIcon({ 
+                html: `<div class="relative flex items-center justify-center w-5 h-5 rounded-full ${isNunggak ? 'bg-red-500' : 'bg-emerald-500'} border-2 border-white shadow-lg"><span class="absolute inset-0 rounded-full border-2 ${isNunggak ? 'border-red-400' : 'border-emerald-400'} animate-ping" style="animation-duration: 1s;"></span></div>`, 
+                className: '', iconSize: [20, 20], iconAnchor: [10, 10] 
+             });
+             marker.setIcon(selectedIcon);
+             marker.setZIndexOffset(1000);
+             marker.isCurrentlySelected = true;
+         } else if (!isSelected && marker.isCurrentlySelected) {
+             const normalIcon = window.L.divIcon({ 
+                html: `<div style="width:14px; height:14px; border-radius:50%; background-color:${isNunggak ? '#ef4444' : '#10b981'}; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4);"></div>`, 
+                className: '', iconSize: [14, 14], iconAnchor: [7, 7] 
+             });
+             marker.setIcon(normalIcon);
+             marker.setZIndexOffset(0);
+             marker.isCurrentlySelected = false;
+         }
+     });
+  }, [selectedMapMerchant, activeMenu, isLeafletLoaded]);
 
   const toggleUserLocation = () => {
     if (!isLeafletLoaded || !mapRef.current) return;
@@ -454,41 +472,55 @@ export default function App() {
     setSpecialDates(newDates); setCalendarModal({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' }); showToast("Jadwal kalender berhasil diperbarui.", "success");
   };
 
-  // MULTIPLE API FAILOVER SYSTEM UNTUK HARI LIBUR
+  // MULTIPLE API FAILOVER SYSTEM UNTUK HARI LIBUR & SKB 3 MENTERI
   const handleSyncHolidays = async () => {
     if (userRole !== 'admin') return;
     setIsSyncing(true);
     try {
       let data = null;
-      let response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
+      let response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
       if (response && response.ok) data = await response.json();
 
       if (!data || data.length === 0) {
-        response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
-        if (response && response.ok) data = await response.json();
-      }
-
-      if (!data || data.length === 0) {
-        response = await fetch(`https://api.allorigins.win/raw?url=https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
+        response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
         if (response && response.ok) data = await response.json();
       }
       
-      if (!data || !Array.isArray(data)) throw new Error('Semua jalur API gagal.');
-
-      const newSpecialDates = { ...specialDates };
-      let added = 0;
-
-      data.forEach(item => { 
-        const tgl = item.holiday_date || item.tanggal;
-        const ket = item.holiday_name || item.keterangan;
-        
-        if (tgl && ket) { newSpecialDates[tgl] = { type: 'LIBUR', name: ket }; added++; } 
-      });
-
-      setSpecialDates(newSpecialDates); 
-      showToast(`Sinkronisasi sukses! ${added} hari libur ditambahkan.`, "success");
+      if (data && Array.isArray(data) && data.length > 0) {
+         const newSpecialDates = { ...specialDates };
+         let added = 0;
+         data.forEach(item => { 
+           const tgl = item.tanggal || item.holiday_date;
+           const ket = item.keterangan || item.holiday_name;
+           const isLibur = item.is_cuti === true || item.is_national_holiday === true || typeof item.is_cuti === 'undefined';
+           
+           if (tgl && ket && isLibur) { newSpecialDates[tgl] = { type: 'LIBUR', name: ket }; added++; } 
+         });
+         setSpecialDates(newSpecialDates); 
+         showToast(`Sinkronisasi sukses! ${added} hari libur ditambahkan.`, "success");
+      } else {
+         throw new Error('Semua jalur API kosong/gagal.');
+      }
     } catch (error) { 
-      showToast(`API Offline. Menggunakan data kalender internal.`, "error"); 
+      // FALLBACK SKB 2026 JIKA API MENGALAMI ERROR ATAU DOWN
+      const fallback2026 = {
+         "2026-01-01": { type: "LIBUR", name: "Tahun Baru Masehi" },
+         "2026-02-17": { type: "LIBUR", name: "Isra Mikraj" },
+         "2026-03-03": { type: "LIBUR", name: "Hari Raya Nyepi" },
+         "2026-03-20": { type: "LIBUR", name: "Idul Fitri" },
+         "2026-03-21": { type: "LIBUR", name: "Idul Fitri" },
+         "2026-04-03": { type: "LIBUR", name: "Wafat Isa Al Masih" },
+         "2026-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
+         "2026-05-14": { type: "LIBUR", name: "Kenaikan Isa Al Masih" },
+         "2026-05-26": { type: "LIBUR", name: "Hari Raya Waisak" },
+         "2026-05-27": { type: "LIBUR", name: "Idul Adha" },
+         "2026-07-16": { type: "LIBUR", name: "Tahun Baru Islam" },
+         "2026-08-17": { type: "LIBUR", name: "Hari Kemerdekaan RI" },
+         "2026-09-27": { type: "LIBUR", name: "Maulid Nabi Muhammad" },
+         "2026-12-25": { type: "LIBUR", name: "Hari Raya Natal" }
+      };
+      setSpecialDates({...specialDates, ...fallback2026});
+      showToast(`API lambat/gagal. Menggunakan Data SKB Offline ${calYear}.`, "success"); 
     }
     setIsSyncing(false);
   };
@@ -1022,7 +1054,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 2. KONTEN PETA */}
+                {/* 2. KONTEN PETA (DENGAN ANIMASI BIP-BIP) */}
                 {activeMenu === 'peta' && (
                   <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-8rem)] animate-in fade-in relative">
                     <div className="w-full h-[55vh] lg:h-auto lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
@@ -1086,7 +1118,6 @@ export default function App() {
                           </div>
                        )}
 
-                       {/* ELEMENT INI TIDAK BOLEH GANDA */}
                        <div id="ragunan-map" className="w-full h-full z-0"></div>
                        
                        {!isLeafletLoaded && (
@@ -1137,7 +1168,7 @@ export default function App() {
                              
                              <div className="p-2.5 sm:p-3 border-b border-slate-100 bg-blue-50/50 flex items-center gap-1.5 sm:gap-2 shrink-0 text-blue-700">
                                 <Navigation className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                                <p className="text-[9px] sm:text-[10px] font-bold leading-tight">Klik pada salah satu nama di bawah untuk terbang ke lokasinya di peta.</p>
+                                <p className="text-[9px] sm:text-[10px] font-bold leading-tight">Klik pada salah satu nama di bawah untuk memunculkan radar lokasi di peta.</p>
                              </div>
 
                              <div className="flex-1 overflow-y-auto p-2 bg-slate-50/50">
@@ -1146,7 +1177,7 @@ export default function App() {
                                ) : (
                                  <ul className="space-y-2">
                                    {merchantsInZone.sort((a,b) => b.totalTunggakan - a.totalTunggakan).map((m, idx) => (
-                                     <li key={idx} onClick={() => flyToMerchantOnMap(m)} className="p-2.5 sm:p-3 bg-white border border-slate-200 rounded-xl hover:bg-blue-50 hover:border-blue-300 transition-all flex flex-col gap-1.5 sm:gap-2 cursor-pointer group shadow-sm">
+                                     <li key={idx} onClick={() => flyToMerchantOnMap(m)} className={`p-2.5 sm:p-3 bg-white border ${selectedMapMerchant?.uid === m.uid ? 'border-blue-400 ring-1 ring-blue-300 shadow-md' : 'border-slate-200 shadow-sm'} rounded-xl hover:bg-blue-50 transition-all flex flex-col gap-1.5 sm:gap-2 cursor-pointer group`}>
                                        <div className="flex justify-between items-start gap-2">
                                          <div className="truncate">
                                            <h5 className="font-bold text-xs sm:text-sm text-slate-800 truncate group-hover:text-blue-600 transition-colors flex items-center gap-1">{m.nama} {m.fotoLapak && <ImageIcon className="w-3 h-3 text-emerald-500" />}</h5>
@@ -1306,7 +1337,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 4. SETTING KALENDER */}
+                {/* 4. SETTING KALENDER (TERMASUK SKB) */}
                 {userRole === 'admin' && activeMenu === 'kalender' && (
                   <div className="max-w-6xl mx-auto space-y-6">
                     <div className="flex flex-col xl:flex-row gap-6">
@@ -1314,14 +1345,14 @@ export default function App() {
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-100 pb-4 gap-4">
                           <div>
                             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><CalendarDays className="w-5 h-5 text-blue-600"/> Kalender Penagihan</h3>
-                            <p className="text-xs text-slate-500 mt-1">Klik tanggal jika ingin menetapkan status tarif khusus secara manual.</p>
+                            <p className="text-xs text-slate-500 mt-1">Klik tanggal untuk menetapkan status tarif hari tersebut secara manual.</p>
                           </div>
                           <div className="flex flex-wrap gap-2 items-center">
                             <select value={calMonth} onChange={e => setCalMonth(parseInt(e.target.value))} className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
                               {['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'].map((m, i) => <option key={i} value={i+1}>{m}</option>)}
                             </select>
                             <input type="number" value={calYear} onChange={e => setCalYear(parseInt(e.target.value))} className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold bg-slate-50 outline-none text-center focus:ring-2 focus:ring-blue-500"/>
-                            <button onClick={handleSyncHolidays} disabled={isSyncing} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50">
+                            <button onClick={handleSyncHolidays} disabled={isSyncing} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50" title="Sinkronkan Libur Nasional dari SKB 3 Menteri">
                               {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />} Sinkronisasi SKB
                             </button>
                           </div>
@@ -1578,7 +1609,9 @@ export default function App() {
               </main>
             </div>
 
-            {/* MODAL HISTORI TAGIHAN (DIBUAT BARU SESUAI PERMINTAAN) */}
+            {/* === SEMUA MODAL-MODAL === */}
+
+            {/* MODAL HISTORI TAGIHAN */}
             {selectedMerchant && (
                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
                   <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl flex flex-col max-h-[85vh] animate-in zoom-in-95">
@@ -1887,7 +1920,7 @@ export default function App() {
               </div>
             )}
 
-            {/* MODAL KALENDER */}
+            {/* MODAL KALENDER (TAMPIL SAAT TANGGAL DIKLIK) */}
             {calendarModal.isOpen && (
                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
                   <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl flex flex-col animate-in zoom-in-95">
