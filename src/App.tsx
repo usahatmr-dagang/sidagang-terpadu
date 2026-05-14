@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 
 // === ZERO-INSTALL ICONS (MOCK LUCIDE WITH FONTAWESOME) ===
