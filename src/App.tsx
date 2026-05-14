@@ -85,6 +85,40 @@ const defaultHolidays = {
 };
 
 export default function App() {
+
+  // === FUNGSI UBAH TITLE & FAVICON OTOMATIS ===
+  useEffect(() => {
+    // 1. Ubah Title Browser
+    document.title = "SiDagangTerpadu";
+
+    // 2. Buat SVG Gerobak TMR untuk Favicon
+    const svgIcon = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+        <rect x="8" y="28" width="48" height="22" fill="#0f172a" rx="4"/>
+        <rect x="12" y="10" width="40" height="18" fill="#3b82f6" rx="2"/>
+        <circle cx="20" cy="56" r="6" fill="#334155"/>
+        <circle cx="44" cy="56" r="6" fill="#334155"/>
+        <circle cx="20" cy="56" r="2" fill="#cbd5e1"/>
+        <circle cx="44" cy="56" r="2" fill="#cbd5e1"/>
+        <text x="32" y="44" font-family="Arial, sans-serif" font-size="14" font-weight="900" fill="#f8fafc" text-anchor="middle">TMR</text>
+        <path d="M 6 28 L 12 10" stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>
+        <path d="M 58 28 L 52 10" stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+    `;
+    
+    // Konversi SVG ke Data URL
+    const iconUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}`;
+    
+    // Cari tag favicon lama atau buat baru
+    let link = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.getElementsByTagName('head')[0].appendChild(link);
+    }
+    link.href = iconUrl;
+  }, []);
+
   // === AUTHENTICATION STATES ===
   const [firebaseUser, setFirebaseUser] = useState(null); 
   const [appUser, setAppUser] = useState(null); 
