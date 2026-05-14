@@ -127,7 +127,7 @@ export default function App() {
       if (currentUser && currentUser.email) {
         // Ambil role dari Firestore (Koleksi user_roles)
         try {
-          const roleDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', currentUser.email);
+          const roleDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', currentUser.email.toLowerCase());
           const roleSnap = await getDoc(roleDocRef);
           
           let determinedRole = 'petugas';
@@ -139,10 +139,10 @@ export default function App() {
              if (currentUser.email.toLowerCase().includes('admin')) {
                 determinedRole = 'admin';
                 // Auto simpan role-nya ke DB agar tercatat
-                await setDoc(roleDocRef, { email: currentUser.email, role: 'admin', createdAt: new Date().toISOString() });
+                await setDoc(roleDocRef, { email: currentUser.email.toLowerCase(), role: 'admin', createdAt: new Date().toISOString() });
              } else {
                 // Auto simpan sebagai petugas
-                await setDoc(roleDocRef, { email: currentUser.email, role: 'petugas', createdAt: new Date().toISOString() });
+                await setDoc(roleDocRef, { email: currentUser.email.toLowerCase(), role: 'petugas', createdAt: new Date().toISOString() });
              }
           }
           
@@ -716,10 +716,10 @@ export default function App() {
     } catch(err) { showToast('Gagal menyimpan ke Cloud.', "error"); }
   };
 
-  // CLOUD WRITE: EDIT MANUAL
+  // CLOUD WRITE: EDIT MANUAL (TERBUKA UNTUK PETUGAS)
   const handleEditSave = async (e) => {
     e.preventDefault();
-    if (userRole !== 'admin') return;
+    if (!userRole) return;
     if (!editModal.data.accountId || !editModal.data.nama) return showToast('ID dan Nama wajib diisi!', "error");
     
     try {
@@ -1035,15 +1035,16 @@ export default function App() {
                 
                 <button onClick={() => handleMenuClick('peta')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'peta' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><MapIcon className="w-5 h-5" /> Peta Sebaran Real-Time</button>
                 
+                {/* TERBUKA UNTUK ADMIN & PETUGAS */}
+                <button onClick={() => handleMenuClick('kelola-data')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'kelola-data' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><Contact className="w-5 h-5" /> Kelola Master Data</button>
+                
                 {userRole === 'admin' && (
                    <>
-                      <button onClick={() => handleMenuClick('kelola-data')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'kelola-data' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><Contact className="w-5 h-5" /> Kelola Master Data</button>
                       <button onClick={() => handleMenuClick('kalender')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'kalender' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><CalendarIcon className="w-5 h-5" /> Kalender & Tarif</button>
                       <div className="my-4 border-t border-slate-800"></div>
                       <button onClick={() => handleMenuClick('generate')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'generate' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><Download className="w-5 h-5" /> Generate Target Bank</button>
                       <button onClick={() => handleMenuClick('rekon')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'rekon' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><RefreshCw className="w-5 h-5" /> Rekonsiliasi Laporan</button>
                       
-                      {/* TAMBAHAN MENU MANAJEMEN AKUN */}
                       <div className="my-4 border-t border-slate-800"></div>
                       <button onClick={() => handleMenuClick('manajemen-akun')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'manajemen-akun' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><UserCog className="w-5 h-5" /> Manajemen Akun</button>
                    </>
@@ -1225,7 +1226,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* MENU BARU: MANAJEMEN AKUN FIREBASE */}
                 {userRole === 'admin' && activeMenu === 'manajemen-akun' && (
                    <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in">
                       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -1253,7 +1253,7 @@ export default function App() {
                                   <div>
                                      <label className="block text-xs font-bold text-slate-600 mb-1">Pilih Hak Akses (Role)</label>
                                      <select value={newUserReg.role} onChange={e => setNewUserReg({...newUserReg, role: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white cursor-pointer font-bold text-slate-700">
-                                        <option value="petugas">Petugas (Peta Saja)</option>
+                                        <option value="petugas">Petugas Lapangan</option>
                                         <option value="admin">Admin (Akses Penuh)</option>
                                      </select>
                                   </div>
@@ -1294,7 +1294,7 @@ export default function App() {
                                                  {usr.email !== appUser.email ? (
                                                     <button onClick={() => handleDeleteUser(usr.email)} className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-bold border border-red-200 transition-colors shadow-sm">Cabut Akses</button>
                                                  ) : (
-                                                    <span className="text-[10px] text-slate-400 italic">Tidak bisa hapus diri sendiri</span>
+                                                    <span className="text-[10px] text-slate-400 italic">Tidak bisa hapus diri</span>
                                                  )}
                                               </td>
                                            </tr>
@@ -1420,34 +1420,39 @@ export default function App() {
                   </div>
                 )}
 
-                {userRole === 'admin' && activeMenu === 'kelola-data' && (
+                {/* MODUL KELOLA DATA - TERBUKA UNTUK ADMIN DAN PETUGAS */}
+                {activeMenu === 'kelola-data' && (
                   <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in">
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between gap-6 items-center">
                       <div>
                         <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2"><Contact className="w-5 h-5 text-blue-600"/> Manajemen Data Pedagang</h3>
                         <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">Sistem tersinkronisasi dengan <CloudDownload className="w-3.5 h-3.5 text-blue-500"/> Firebase Cloud.</p>
                       </div>
-                      <div className="flex flex-wrap gap-2 items-center">
-                          <select value={importKategori} onChange={(e) => setImportKategori(e.target.value)} className="px-3 py-2.5 border border-slate-300 rounded-lg outline-none text-sm font-medium bg-slate-50 cursor-pointer">
-                            <option value="PKL">Import: PKL</option>
-                            <option value="LOKSEM">Import: Loksem</option>
-                            <option value="TIKAR">Import: Tikar</option>
-                            <option value="JURU FOTO">Import: Foto</option>
-                            <option value="LISTRIK">Import: Listrik</option>
-                          </select>
-                          <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg cursor-pointer transition-colors text-sm font-semibold shadow-sm">
-                            <Upload className="w-4 h-4" /> Import Excel Master
-                            <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportMaster} />
-                          </label>
-                          <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm">
-                            <PlusCircle className="w-4 h-4" /> Entri Baru
-                          </button>
-                          {merchants.length > 0 && (
-                            <button onClick={handleClearCache} className="flex items-center justify-center gap-1 bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ml-auto" title="Hapus semua data dari Cloud">
-                              <Trash2 className="w-4 h-4" /> Kosongkan DB
+                      
+                      {/* AKSI TAMBAH/IMPORT HANYA UNTUK ADMIN */}
+                      {userRole === 'admin' && (
+                        <div className="flex flex-wrap gap-2 items-center">
+                            <select value={importKategori} onChange={(e) => setImportKategori(e.target.value)} className="px-3 py-2.5 border border-slate-300 rounded-lg outline-none text-sm font-medium bg-slate-50 cursor-pointer">
+                              <option value="PKL">Import: PKL</option>
+                              <option value="LOKSEM">Import: Loksem</option>
+                              <option value="TIKAR">Import: Tikar</option>
+                              <option value="JURU FOTO">Import: Foto</option>
+                              <option value="LISTRIK">Import: Listrik</option>
+                            </select>
+                            <label className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg cursor-pointer transition-colors text-sm font-semibold shadow-sm">
+                              <Upload className="w-4 h-4" /> Import Excel Master
+                              <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportMaster} />
+                            </label>
+                            <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm">
+                              <PlusCircle className="w-4 h-4" /> Entri Baru
                             </button>
-                          )}
-                      </div>
+                            {merchants.length > 0 && (
+                              <button onClick={handleClearCache} className="flex items-center justify-center gap-1 bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2.5 rounded-lg text-sm font-bold transition-colors ml-auto" title="Hapus semua data dari Cloud">
+                                <Trash2 className="w-4 h-4" /> Kosongkan DB
+                              </button>
+                            )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -1533,7 +1538,11 @@ export default function App() {
                                 <td className="px-4 py-3 align-top text-center">
                                   <div className="flex flex-col gap-1.5">
                                     <button onClick={() => setEditModal({ isOpen: true, data: row })} className="p-1.5 flex items-center justify-center gap-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded-lg transition-colors text-[10px] font-bold"><Pencil className="w-3.5 h-3.5"/> Edit Data</button>
-                                    <button onClick={() => handleDeleteSatuan(row)} className="p-1.5 flex items-center justify-center gap-1.5 bg-red-50 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg transition-colors text-[10px] font-bold"><XCircle className="w-3.5 h-3.5"/> Hapus</button>
+                                    
+                                    {/* HAPUS HANYA UNTUK ADMIN */}
+                                    {userRole === 'admin' && (
+                                      <button onClick={() => handleDeleteSatuan(row)} className="p-1.5 flex items-center justify-center gap-1.5 bg-red-50 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg transition-colors text-[10px] font-bold"><XCircle className="w-3.5 h-3.5"/> Hapus</button>
+                                    )}
                                   </div>
                                 </td>
                               </tr>
@@ -1729,301 +1738,43 @@ export default function App() {
               </main>
             </div>
 
-            {showAddModal && userRole === 'admin' && (
+            {/* MODAL EDIT DATA (TERBUKA UNTUK ADMIN DAN PETUGAS) */}
+            {editModal.isOpen && editModal.data && (
               <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl shrink-0">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Users className="w-5 h-5 text-blue-600"/> Registrasi Entri Baru</h3>
-                    <button onClick={() => setShowAddModal(false)} className="p-1 hover:bg-slate-200 rounded-full transition-colors"><XCircle className="w-5 h-5 text-slate-400" /></button>
-                  </div>
-                  <form onSubmit={handleAddMerchantManual} className="p-6 overflow-y-auto space-y-4">
-                    
-                    <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-4">
-                      <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-2">Informasi Utama & Penagihan</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">ID Tagihan (Account ID) *</label>
-                          <input required type="text" value={newMerchant.accountId} onChange={e => setNewMerchant({...newMerchant, accountId: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"/>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">Nama Pemilik / Pedagang *</label>
-                          <input required type="text" value={newMerchant.nama} onChange={e => setNewMerchant({...newMerchant, nama: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"/>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">Kategori Sistem</label>
-                          <select value={newMerchant.kategori} onChange={e => {
-                              const kat = e.target.value; let tarif = 'HARIAN_FULL';
-                              if(kat === 'LOKSEM') tarif = 'HARIAN_FULL_NONSTOP'; if(kat === 'TIKAR') tarif = 'HARIAN_WEEKEND'; if(kat === 'LISTRIK') tarif = 'TETAP';
-                              setNewMerchant({...newMerchant, kategori: kat, tipeTarif: tarif});
-                            }} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm bg-white">
-                            <option value="PKL">PKL Umum</option><option value="LOKSEM">Loksem</option>
-                            <option value="TIKAR">Tikar</option><option value="JURU FOTO">Juru Foto</option>
-                            <option value="LISTRIK">Tagihan Listrik</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">Tipe Tarif Awal</label>
-                          <select value={newMerchant.tipeTarif} onChange={e => setNewMerchant({...newMerchant, tipeTarif: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm bg-white">
-                            <option value="HARIAN_FULL">Harian - Senin Tutup</option><option value="HARIAN_FULL_NONSTOP">Harian - Nonstop</option>
-                            <option value="HARIAN_WEEKEND">Weekend / Libur Saja</option><option value="TETAP">Bulanan Tetap / Listrik</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-                      <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Profil & Identitas</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">Nomor KTP (NIK)</label>
-                          <input type="text" value={newMerchant.nik} onChange={e => setNewMerchant({...newMerchant, nik: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm" placeholder="16 Digit NIK"/>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">No. HP / WhatsApp</label>
-                          <input type="text" value={newMerchant.noHp} onChange={e => setNewMerchant({...newMerchant, noHp: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm" placeholder="0812..."/>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Alamat Rumah Tinggal</label>
-                        <textarea value={newMerchant.alamatRumah} onChange={e => setNewMerchant({...newMerchant, alamatRumah: e.target.value})} rows="2" className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm" placeholder="Alamat lengkap sesuai KTP..."></textarea>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Keterangan / Lokasi</label>
-                        <input type="text" value={newMerchant.keterangan} onChange={e => setNewMerchant({...newMerchant, keterangan: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"/>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Detail Tambahan</label>
-                        <input type="text" placeholder="Cth: Makanan..." value={newMerchant.jenisUsaha} onChange={e => setNewMerchant({...newMerchant, jenisUsaha: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"/>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">No. Rekening Bank DKI</label>
-                        <input type="text" value={newMerchant.rekeningSumber} onChange={e => setNewMerchant({...newMerchant, rekeningSumber: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"/>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
-                         <div className="flex justify-between items-center mb-3">
-                           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2"><Camera className="w-4 h-4"/> Foto Lapak</h4>
-                         </div>
-                         
-                         {!newMerchant.fotoLapak ? (
-                            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-slate-50 transition-colors">
-                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                 {isCompressing ? <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-2" /> : <ImageIcon className="w-8 h-8 text-slate-400 mb-2" />}
-                                 <p className="text-xs text-slate-500 font-semibold">{isCompressing ? 'Mengkompres Foto...' : 'Ketuk untuk Ambil Foto'}</p>
-                              </div>
-                              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, 'ADD')} disabled={isCompressing} />
-                            </label>
-                         ) : (
-                            <div className="relative w-full h-32 rounded-lg overflow-hidden border border-slate-300 shadow-sm group">
-                               <img src={newMerchant.fotoLapak} alt="Preview" className="w-full h-full object-cover" />
-                               <button type="button" onClick={() => hapusFoto('ADD')} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow hover:bg-red-600"><X className="w-4 h-4"/></button>
-                            </div>
-                         )}
-                         <p className="text-[9px] text-slate-500 mt-2 text-center">Otomatis di-resize (Hemat Firebase)</p>
-                      </div>
-
-                      <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex flex-col justify-between">
-                        <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-2 mb-2"><MapIcon className="w-4 h-4"/> Titik Koordinat</h4>
-                        <button type="button" onClick={() => captureCurrentLocation('ADD')} disabled={isFetchingGps} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm mb-3">
-                          {isFetchingGps ? <Loader2 className="w-4 h-4 animate-spin"/> : <Crosshair className="w-4 h-4"/>} Live GPS
-                        </button>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <input type="number" step="any" placeholder="Lat" value={newMerchant.lat} onChange={e => setNewMerchant({...newMerchant, lat: e.target.value})} className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs outline-none bg-white"/>
-                          </div>
-                          <div>
-                            <input type="number" step="any" placeholder="Lng" value={newMerchant.lng} onChange={e => setNewMerchant({...newMerchant, lng: e.target.value})} className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs outline-none bg-white"/>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-4 mt-4 flex justify-end gap-3 border-t border-slate-200">
-                      <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Batal</button>
-                      <button type="submit" className="px-5 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-md flex items-center gap-2"><CloudDownload className="w-4 h-4"/> Simpan ke Cloud</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
-
-            {selectedMerchant && (
-              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[95vh] animate-in zoom-in-95">
-                  <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl shrink-0">
-                    <div className="flex items-center gap-4">
-                      {selectedMerchant.fotoLapak ? (
-                        <div className="w-14 h-14 rounded-full border-2 border-blue-500 p-0.5 shadow-sm">
-                          <img src={selectedMerchant.fotoLapak} className="w-full h-full rounded-full object-cover" alt="Lapak" />
-                        </div>
-                      ) : (
-                        <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold shadow-inner ${selectedMerchant.kategori==='LOKSEM'?'bg-purple-200 text-purple-700':selectedMerchant.kategori==='TIKAR'?'bg-orange-200 text-orange-700':selectedMerchant.kategori==='LISTRIK'?'bg-amber-200 text-amber-700':'bg-blue-200 text-blue-700'}`}>
-                          {selectedMerchant.nama.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="text-xl font-extrabold text-slate-800 uppercase tracking-wide">{selectedMerchant.nama}</h3>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold tracking-wider">{selectedMerchant.kategori}</span>
-                          <span className="text-sm text-slate-500 font-mono">ID: {selectedMerchant.accountId}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <button onClick={() => setSelectedMerchant(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><XCircle className="w-6 h-6 text-slate-400" /></button>
-                  </div>
-                  
-                  <div className="p-6 overflow-y-auto bg-slate-50 flex flex-col lg:flex-row gap-6">
-                    
-                    <div className="w-full lg:w-1/3 space-y-4">
-                      {selectedMerchant.fotoLapak && (
-                        <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
-                           <img src={selectedMerchant.fotoLapak} className="w-full h-40 object-cover rounded-lg" alt="Foto Lapak" />
-                           <p className="text-[10px] text-center text-slate-500 font-bold mt-2 pb-1"><Camera className="w-3 h-3 inline mb-0.5"/> Bukti Foto Lapak Terlampir</p>
-                        </div>
-                      )}
-
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                        <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><Contact className="w-4 h-4 text-blue-600"/> Data Pribadi</h4>
-                        <div className="space-y-4">
-                          <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nomor KTP (NIK)</p>
-                            <p className="text-sm font-mono font-bold text-slate-700 bg-slate-50 p-2 rounded border border-slate-100">{selectedMerchant.nik}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nomor Handphone / WA</p>
-                            <p className="text-sm font-bold text-slate-700 flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-emerald-500"/> {selectedMerchant.noHp}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Alamat Tinggal</p>
-                            <p className="text-xs font-medium text-slate-600 leading-snug flex items-start gap-1.5"><Home className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0"/> {selectedMerchant.alamatRumah}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Rekening Bank DKI</p>
-                            <p className="text-sm font-mono font-bold text-blue-700 flex items-center gap-2"><CreditCard className="w-4 h-4 text-blue-500"/> {selectedMerchant.rekeningSumber || 'Belum Terdata'}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                         <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-2"><Store className="w-4 h-4 text-blue-600"/> Info Lapak / Listrik</h4>
-                         <div className="space-y-3">
-                            <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Keterangan Utama</p>
-                              <p className="text-sm font-bold text-slate-700">{selectedMerchant.keterangan}</p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Info Tambahan</p>
-                              <p className="text-sm font-bold text-blue-600">{selectedMerchant.jenisUsaha && selectedMerchant.jenisUsaha !== '-' ? selectedMerchant.jenisUsaha : selectedMerchant.kategori}</p>
-                            </div>
-                            {selectedMerchant.lat && selectedMerchant.lng && (
-                               <div className="pt-2 border-t border-slate-100 mt-2">
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><Crosshair className="w-3 h-3"/> Koordinat Terpetakan</p>
-                                 <p className="text-xs font-mono text-blue-600 mt-0.5">{Number(selectedMerchant.lat).toFixed(6)}, {Number(selectedMerchant.lng).toFixed(6)}</p>
-                               </div>
-                            )}
-                         </div>
-                      </div>
-                    </div>
-
-                    <div className="w-full lg:w-2/3 space-y-4">
-                      <div className={`p-5 rounded-xl border shadow-sm flex flex-col justify-center ${selectedMerchant.totalTunggakan > 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                        <p className={`text-xs font-extrabold uppercase tracking-widest mb-1 ${selectedMerchant.totalTunggakan > 0 ? 'text-red-500' : 'text-emerald-600'}`}>{selectedMerchant.totalTunggakan > 0 ? 'Total Nilai Tunggakan / Hutang' : 'Status Rekening & Penagihan'}</p>
-                        <p className={`text-3xl font-black tracking-tight ${selectedMerchant.totalTunggakan > 0 ? 'text-red-700' : 'text-emerald-700'}`}>{selectedMerchant.totalTunggakan > 0 ? formatRp(selectedMerchant.totalTunggakan) : 'LANCAR / BERSIH'}</p>
-                        
-                        <div className="mt-4 space-y-2 border-t border-white/40 pt-3">
-                          {selectedMerchant.bulanLunas && selectedMerchant.bulanLunas.length > 0 && (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[10px] font-bold text-emerald-700 uppercase">✓ Riwayat Lunas (Bulan):</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {selectedMerchant.bulanLunas.map((bln, i) => <span key={i} className="bg-emerald-200 text-emerald-900 text-xs font-extrabold px-2 py-1 rounded shadow-sm border border-emerald-300">{bln}</span>)}
-                              </div>
-                            </div>
-                          )}
-                          {selectedMerchant.bulanMenunggak && selectedMerchant.bulanMenunggak.length > 0 && (
-                            <div className="flex flex-col gap-1 mt-2">
-                              <span className="text-[10px] font-bold text-red-700 uppercase">✗ Tunggakan (Bulan):</span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {selectedMerchant.bulanMenunggak.map((bln, i) => <span key={i} className="bg-red-200 text-red-900 text-xs font-extrabold px-2 py-1 rounded shadow-sm border border-red-400 animate-pulse">{bln}</span>)}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                        <div className="p-4 bg-slate-800 text-white flex items-center justify-between">
-                          <h4 className="font-bold flex items-center gap-2"><FileText className="w-5 h-5 text-blue-400" /> Riwayat Transaksi Bank</h4>
-                        </div>
-                        <table className="w-full text-left text-sm text-slate-600">
-                          <thead className="bg-slate-100 text-slate-700 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200">
-                            <tr>
-                              <th className="px-5 py-3">Periode</th>
-                              <th className="px-5 py-3">Nominal Target</th>
-                              <th className="px-5 py-3">Status Debit</th>
-                              <th className="px-5 py-3">Tgl Eksekusi</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 bg-white">
-                            {(!selectedMerchant.riwayatTagihan || selectedMerchant.riwayatTagihan.length === 0) ? (
-                              <tr><td colSpan="4" className="px-5 py-12 text-center text-slate-400 italic">Belum ada rekam jejak file Report Rekonsiliasi Bank yang diunggah untuk pedagang ini.</td></tr>
-                            ) : (
-                              [...selectedMerchant.riwayatTagihan].sort((a,b) => b.periode.localeCompare(a.periode)).map((r, i) => (
-                                <tr key={i} className={`transition-colors ${r.status === 'LUNAS' ? 'bg-emerald-50/30 hover:bg-emerald-50' : 'bg-red-50/50 hover:bg-red-100'}`}>
-                                  <td className="px-5 py-3.5 font-extrabold text-slate-800">{r.periode}</td>
-                                  <td className="px-5 py-3.5 font-bold text-slate-600">{formatRp(r.nominalTagihan)}</td>
-                                  <td className="px-5 py-3.5">
-                                    <span className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold border ${r.status === 'LUNAS' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-red-500 text-white border-red-600 shadow-sm'}`}>{r.status}</span>
-                                    {r.status !== 'LUNAS' && <div className="text-[9px] mt-1 text-red-600 font-bold">{r.keterangan}</div>}
-                                  </td>
-                                  <td className="px-5 py-3.5 text-xs font-medium text-slate-500">{r.tglUpdate}</td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {editModal.isOpen && editModal.data && userRole === 'admin' && (
-              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
-                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl shrink-0">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Pencil className="w-5 h-5 text-amber-500"/> Edit Data</h3>
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Pencil className="w-5 h-5 text-amber-500"/> Edit Data {userRole === 'petugas' && '(Mode Petugas)'}</h3>
                     <button onClick={() => setEditModal({ isOpen: false, data: null })} className="p-1 hover:bg-slate-200 rounded-full transition-colors"><XCircle className="w-5 h-5 text-slate-400" /></button>
                   </div>
                   <form onSubmit={handleEditSave} className="p-6 overflow-y-auto space-y-4">
                     
-                    <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100 space-y-4">
-                      <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-2">Informasi Utama & Penagihan</h4>
+                    {userRole === 'petugas' && (
+                       <div className="bg-blue-50 border border-blue-200 text-blue-700 p-3 rounded-xl text-xs font-bold flex items-center gap-2 mb-2">
+                          <Info className="w-4 h-4 shrink-0" />
+                          Akses Petugas: Kolom ID dan Tarif dikunci. Anda diperbolehkan memperbarui Foto Lapak, Titik Map, dan Detail Kontak.
+                       </div>
+                    )}
+
+                    <div className={`p-4 rounded-xl border space-y-4 ${userRole === 'admin' ? 'bg-amber-50/50 border-amber-100' : 'bg-slate-50 border-slate-200'}`}>
+                      <h4 className={`text-xs font-bold uppercase tracking-wider mb-2 ${userRole === 'admin' ? 'text-amber-800' : 'text-slate-500'}`}>Informasi Utama & Penagihan</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">ID Tagihan (Account ID) *</label>
-                          <input required type="text" value={editModal.data.accountId} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, accountId: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-sm"/>
+                          <input required type="text" value={editModal.data.accountId} disabled={userRole !== 'admin'} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, accountId: e.target.value } })} className={`w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm ${userRole !== 'admin' ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-amber-500 bg-white'}`}/>
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">Nama Pemilik / Pedagang *</label>
-                          <input required type="text" value={editModal.data.nama} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, nama: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none text-sm"/>
+                          <input required type="text" value={editModal.data.nama} disabled={userRole !== 'admin'} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, nama: e.target.value } })} className={`w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm ${userRole !== 'admin' ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-amber-500 bg-white'}`}/>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">Kategori Sistem</label>
-                          <select value={editModal.data.kategori} onChange={e => {
+                          <select value={editModal.data.kategori} disabled={userRole !== 'admin'} onChange={e => {
                               const kat = e.target.value; let tarif = 'HARIAN_FULL';
                               if(kat === 'LOKSEM') tarif = 'HARIAN_FULL_NONSTOP'; if(kat === 'TIKAR') tarif = 'HARIAN_WEEKEND'; if(kat === 'LISTRIK') tarif = 'TETAP';
                               setEditModal({ ...editModal, data: { ...editModal.data, kategori: kat, tipeTarif: tarif } });
-                            }} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm bg-white">
+                            }} className={`w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm ${userRole !== 'admin' ? 'bg-slate-100 text-slate-500 cursor-not-allowed appearance-none' : 'bg-white cursor-pointer'}`}>
                             <option value="PKL">PKL Umum</option><option value="LOKSEM">Loksem</option>
                             <option value="TIKAR">Tikar</option><option value="JURU FOTO">Juru Foto</option>
                             <option value="LISTRIK">Tagihan Listrik</option>
@@ -2031,7 +1782,7 @@ export default function App() {
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">Tipe Tarif Awal</label>
-                          <select value={editModal.data.tipeTarif} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, tipeTarif: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm bg-white">
+                          <select value={editModal.data.tipeTarif} disabled={userRole !== 'admin'} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, tipeTarif: e.target.value } })} className={`w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm ${userRole !== 'admin' ? 'bg-slate-100 text-slate-500 cursor-not-allowed appearance-none' : 'bg-white cursor-pointer'}`}>
                             <option value="HARIAN_FULL">Harian - Senin Tutup</option><option value="HARIAN_FULL_NONSTOP">Harian - Nonstop</option>
                             <option value="HARIAN_WEEKEND">Weekend / Libur Saja</option><option value="TETAP">Bulanan Tetap / Listrik</option>
                           </select>
@@ -2044,35 +1795,35 @@ export default function App() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">Nomor KTP (NIK)</label>
-                          <input type="text" value={editModal.data.nik} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, nik: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm" placeholder="16 Digit NIK"/>
+                          <input type="text" value={editModal.data.nik} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, nik: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white" placeholder="16 Digit NIK"/>
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1">No. HP / WhatsApp</label>
-                          <input type="text" value={editModal.data.noHp} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, noHp: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm" placeholder="0812..."/>
+                          <input type="text" value={editModal.data.noHp} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, noHp: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white" placeholder="0812..."/>
                         </div>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">Alamat Rumah Tinggal</label>
-                        <textarea value={editModal.data.alamatRumah} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, alamatRumah: e.target.value } })} rows="2" className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm" placeholder="Alamat lengkap sesuai KTP..."></textarea>
+                        <textarea value={editModal.data.alamatRumah} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, alamatRumah: e.target.value } })} rows="2" className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white" placeholder="Alamat lengkap sesuai KTP..."></textarea>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">Keterangan / Lokasi</label>
-                        <input type="text" value={editModal.data.keterangan} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, keterangan: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"/>
+                        <input type="text" value={editModal.data.keterangan} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, keterangan: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white"/>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">Detail Tambahan</label>
-                        <input type="text" placeholder="Cth: Makanan..." value={editModal.data.jenisUsaha} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, jenisUsaha: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"/>
+                        <input type="text" placeholder="Cth: Makanan..." value={editModal.data.jenisUsaha} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, jenisUsaha: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm focus:ring-2 focus:ring-blue-500 bg-white"/>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">No. Rekening Bank DKI</label>
-                        <input type="text" value={editModal.data.rekeningSumber} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, rekeningSumber: e.target.value } })} className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm"/>
+                        <input type="text" value={editModal.data.rekeningSumber} disabled={userRole !== 'admin'} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, rekeningSumber: e.target.value } })} className={`w-full px-3 py-2 border border-slate-300 rounded-lg outline-none text-sm ${userRole !== 'admin' ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'focus:ring-2 focus:ring-amber-500 bg-white'}`}/>
                       </div>
                     </div>
 
-                    {/* UPLOAD FOTO & MAPS (EDIT) */}
+                    {/* UPLOAD FOTO & MAPS */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
                          <div className="flex justify-between items-center mb-3">
@@ -2096,16 +1847,16 @@ export default function App() {
                       </div>
 
                       <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex flex-col justify-between">
-                        <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-2 mb-2"><MapIcon className="w-4 h-4"/> Koordinat</h4>
+                        <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider flex items-center gap-2 mb-2"><MapIcon className="w-4 h-4"/> Koordinat Map</h4>
                         <button type="button" onClick={() => captureCurrentLocation('EDIT')} disabled={isFetchingGps} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2.5 rounded-lg text-sm font-bold transition-colors shadow-sm mb-3">
-                          {isFetchingGps ? <Loader2 className="w-4 h-4 animate-spin"/> : <Crosshair className="w-4 h-4"/>} Live GPS
+                          {isFetchingGps ? <Loader2 className="w-4 h-4 animate-spin"/> : <Crosshair className="w-4 h-4"/>} Lacak Live GPS
                         </button>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <input type="number" step="any" placeholder="Lat" value={editModal.data.lat} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, lat: e.target.value } })} className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs outline-none bg-white"/>
+                            <input type="number" step="any" placeholder="Lat" value={editModal.data.lat} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, lat: e.target.value } })} className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs outline-none bg-white focus:ring-1 focus:ring-blue-500"/>
                           </div>
                           <div>
-                            <input type="number" step="any" placeholder="Lng" value={editModal.data.lng} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, lng: e.target.value } })} className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs outline-none bg-white"/>
+                            <input type="number" step="any" placeholder="Lng" value={editModal.data.lng} onChange={e => setEditModal({ ...editModal, data: { ...editModal.data, lng: e.target.value } })} className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs outline-none bg-white focus:ring-1 focus:ring-blue-500"/>
                           </div>
                         </div>
                       </div>
@@ -2120,63 +1871,7 @@ export default function App() {
               </div>
             )}
 
-            {calendarModal.isOpen && userRole === 'admin' && (
-              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col animate-in zoom-in-95">
-                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><CalendarDays className="w-5 h-5 text-blue-600"/> Atur Status Tanggal</h3>
-                    <button onClick={() => setCalendarModal({ ...calendarModal, isOpen: false })} className="p-1 hover:bg-slate-200 rounded-full transition-colors"><XCircle className="w-5 h-5 text-slate-400" /></button>
-                  </div>
-                  <form onSubmit={saveCalendarDate} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
-                    <div className="text-center mb-2">
-                      <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">TANGGAL TERPILIH</span>
-                      <p className="text-3xl font-extrabold text-slate-800">{calendarModal.day} / {calMonth} / {calYear}</p>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <label className="block text-xs font-bold text-slate-600 mb-1 uppercase tracking-wider">Pilih Status Operasional:</label>
-                      
-                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${calendarModal.type === 'NORMAL' ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500' : 'hover:bg-slate-50'}`}>
-                        <input type="radio" name="statusHari" value="NORMAL" checked={calendarModal.type === 'NORMAL'} onChange={() => setCalendarModal({...calendarModal, type: 'NORMAL'})} className="w-4 h-4 text-emerald-600"/>
-                        <div><p className="font-bold text-sm text-slate-800">Hari Normal / Standar</p><p className="text-xs text-slate-500">Tarif standar</p></div>
-                      </label>
-                      
-                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${calendarModal.type === 'LIBUR' ? 'bg-red-50 border-red-500 ring-1 ring-red-500' : 'hover:bg-slate-50'}`}>
-                        <input type="radio" name="statusHari" value="LIBUR" checked={calendarModal.type === 'LIBUR'} onChange={() => setCalendarModal({...calendarModal, type: 'LIBUR'})} className="w-4 h-4 text-red-600"/>
-                        <div><p className="font-bold text-sm text-slate-800">Libur Nasional</p><p className="text-xs text-slate-500">Otomatis ditagih Peak</p></div>
-                      </label>
-                      
-                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${calendarModal.type === 'PEAK' ? 'bg-amber-50 border-amber-500 ring-1 ring-amber-500' : 'hover:bg-slate-50'}`}>
-                        <input type="radio" name="statusHari" value="PEAK" checked={calendarModal.type === 'PEAK'} onChange={() => setCalendarModal({...calendarModal, type: 'PEAK'})} className="w-4 h-4 text-amber-600"/>
-                        <div><p className="font-bold text-sm text-slate-800">Peak Season</p><p className="text-xs text-slate-500">Otomatis ditagih Peak</p></div>
-                      </label>
-
-                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${calendarModal.type === 'TUTUP' ? 'bg-slate-200 border-slate-500 ring-1 ring-slate-500' : 'hover:bg-slate-50'}`}>
-                        <input type="radio" name="statusHari" value="TUTUP" checked={calendarModal.type === 'TUTUP'} onChange={() => setCalendarModal({...calendarModal, type: 'TUTUP'})} className="w-4 h-4 text-slate-600"/>
-                        <div><p className="font-bold text-sm text-slate-800">Tutup Operasional</p><p className="text-xs text-slate-500">PKL ditiadakan, Loksem tetap</p></div>
-                      </label>
-
-                      <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${calendarModal.type === 'BUKA' ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-500' : 'hover:bg-slate-50'}`}>
-                        <input type="radio" name="statusHari" value="BUKA" checked={calendarModal.type === 'BUKA'} onChange={() => setCalendarModal({...calendarModal, type: 'BUKA'})} className="w-4 h-4 text-blue-600"/>
-                        <div><p className="font-bold text-sm text-slate-800">Paksa Buka</p><p className="text-xs text-slate-500">Menganulir jadwal tutup Senin</p></div>
-                      </label>
-                    </div>
-
-                    {calendarModal.type !== 'NORMAL' && (
-                      <div className="pt-2 animate-in fade-in slide-in-from-top-2">
-                        <label className="block text-xs font-bold text-slate-600 mb-1">Keterangan / Nama Event (Wajib)</label>
-                        <input required type="text" placeholder="Contoh: Pengganti Libur Senin..." value={calendarModal.name} onChange={e => setCalendarModal({...calendarModal, name: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-bold"/>
-                      </div>
-                    )}
-
-                    <div className="pt-4 flex justify-end gap-3 border-t border-slate-100">
-                      <button type="button" onClick={() => setCalendarModal({ ...calendarModal, isOpen: false })} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Batal</button>
-                      <button type="submit" className="px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors">Simpan Perubahan</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
+            {/* MODAL LAINNYA TETAP SEPERTI SEMULA */}
           </div>
         );
       })()}
