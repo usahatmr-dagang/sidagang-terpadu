@@ -508,7 +508,7 @@ export default function App() {
           const parsed = parseExcelSafely(workbook.Sheets[sheetName], ['ACCOUNT ID', 'ID', 'NO LOKSEM', 'NAMA', 'NAMA NASABAH']);
           if (parsed && parsed.length > 0) { foundData = parsed; break; }
         }
-        if (!foundData) return showToast("Struktur tabel ID/Nama tidak ditemukan.", "error");
+        if (!foundData) return showToast("Struktur tabel ID/Nama tidak ditemukan di Excel.", "error");
 
         const batchPromises = [];
         let addedCount = 0; let updatedCount = 0;
@@ -522,7 +522,13 @@ export default function App() {
           const lokasiDetail = row['KETERANGAN 1'] || row['LOKASI'] || row['ALAMAT'] || '-';
           const jenisUsaha = row['JENIS USAHA'] || row['USAHA'] || row['JENIS PRODUK'] || row['PRODUK'] || row['KETERANGAN 3'] || '-';
           
-          const uid = String(rawId).trim() + '_' + String(lokasiDetail).trim();
+          // --- PERBAIKAN UNTUK VERCEL / FIREBASE ---
+          // Mengganti karakter garis miring (/) dengan strip (-) agar Firebase tidak menganggapnya sebagai sub-folder
+          const safeRawId = String(rawId).replace(/\//g, '-').trim();
+          const safeLokasi = String(lokasiDetail).replace(/\//g, '-').trim();
+          const uid = safeRawId + '_' + safeLokasi;
+          // -----------------------------------------
+
           const existingIdx = merchants.findIndex(ex => ex.uid === uid);
 
           if (existingIdx === -1) {
@@ -572,7 +578,10 @@ export default function App() {
 
         await Promise.all(batchPromises);
         showToast(`Import Selesai! ${addedCount} Baru, ${updatedCount} Diperbarui ke Cloud.`, "success");
-      } catch (err) { showToast("Gagal membaca Excel/Upload ke Cloud.", "error"); }
+      } catch (err) { 
+        console.error("ERROR FIREBASE SAAT IMPORT:", err);
+        showToast("Gagal membaca Excel/Upload ke Cloud. Buka Console (F12) untuk detail error.", "error"); 
+      }
     };
     reader.readAsArrayBuffer(file); e.target.value = null;
   };
@@ -598,7 +607,11 @@ export default function App() {
     if (userRole !== 'admin') return;
     if(!newMerchant.accountId || !newMerchant.nama) return showToast('ID dan Nama wajib diisi!', "error");
     
-    const newUid = newMerchant.accountId + '_' + newMerchant.keterangan;
+    // PERBAIKAN: Sama seperti import excel, bersihkan slash pada ID manual
+    const safeRawId = String(newMerchant.accountId).replace(/\//g, '-').trim();
+    const safeLokasi = String(newMerchant.keterangan).replace(/\//g, '-').trim();
+    const newUid = safeRawId + '_' + safeLokasi;
+
     if(merchants.find(m => m.uid === newUid)) return showToast('ID dengan lokasi tersebut sudah terdaftar!', "error");
     
     const finalData = {
