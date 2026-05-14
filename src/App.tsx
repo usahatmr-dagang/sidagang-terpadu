@@ -65,7 +65,7 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
   appId: "1:1065543308691:web:46ae59e9dd9f92a3f60466"
 };
 
-// Inisialisasi App Utama (Untuk Login & Database)
+// Inisialisasi App Utama
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -86,12 +86,8 @@ const defaultHolidays = {
 
 export default function App() {
 
-  // === FUNGSI UBAH TITLE & FAVICON OTOMATIS ===
   useEffect(() => {
-    // 1. Ubah Title Browser
     document.title = "SiDagangTerpadu";
-
-    // 2. Buat SVG Gerobak TMR untuk Favicon
     const svgIcon = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
         <rect x="8" y="28" width="48" height="22" fill="#0f172a" rx="4"/>
@@ -105,21 +101,12 @@ export default function App() {
         <path d="M 58 28 L 52 10" stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>
       </svg>
     `;
-    
-    // Konversi SVG ke Data URL
     const iconUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgIcon)}`;
-    
-    // Cari tag favicon lama atau buat baru
     let link = document.querySelector("link[rel~='icon']");
-    if (!link) {
-      link = document.createElement('link');
-      link.rel = 'icon';
-      document.getElementsByTagName('head')[0].appendChild(link);
-    }
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.getElementsByTagName('head')[0].appendChild(link); }
     link.href = iconUrl;
   }, []);
 
-  // === AUTHENTICATION STATES ===
   const [firebaseUser, setFirebaseUser] = useState(null); 
   const [appUser, setAppUser] = useState(null); 
   const [userRole, setUserRole] = useState(null); 
@@ -129,18 +116,15 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // States Utama
   const [merchants, setMerchants] = useState([]);
-  const [systemUsers, setSystemUsers] = useState([]); // List akun
+  const [systemUsers, setSystemUsers] = useState([]);
   const [isDbLoading, setIsDbLoading] = useState(true);
 
-  // Fungsi Format Rupiah
   const formatRp = (angka) => {
     if (angka === undefined || angka === null || isNaN(angka)) return 'Rp 0';
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   };
 
-  // Custom UI States
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
   const [confirmDialog, setConfirmDialog] = useState({ show: false, message: '', onConfirm: null });
 
@@ -153,29 +137,22 @@ export default function App() {
     setConfirmDialog({ show: true, message, onConfirm: () => { actionFn(); setConfirmDialog({show:false}); } });
   };
 
-  // 1. Inisialisasi Auth Real Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
-      
       if (currentUser && currentUser.email) {
-        // Ambil role dari Firestore (Koleksi user_roles)
         try {
           const roleDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', currentUser.email.toLowerCase());
           const roleSnap = await getDoc(roleDocRef);
-          
           let determinedRole = 'petugas';
           
           if (roleSnap.exists()) {
              determinedRole = roleSnap.data().role;
           } else {
-             // Fallback: Jika ini akun lama yang ada "admin" di emailnya, kita auto-assign jadi admin
              if (currentUser.email.toLowerCase().includes('admin')) {
                 determinedRole = 'admin';
-                // Auto simpan role-nya ke DB agar tercatat
                 await setDoc(roleDocRef, { email: currentUser.email.toLowerCase(), role: 'admin', createdAt: new Date().toISOString() });
              } else {
-                // Auto simpan sebagai petugas
                 await setDoc(roleDocRef, { email: currentUser.email.toLowerCase(), role: 'petugas', createdAt: new Date().toISOString() });
              }
           }
@@ -185,41 +162,57 @@ export default function App() {
           if (determinedRole === 'admin') setActiveMenu('dashboard');
           else setActiveMenu('peta');
 
-        } catch (error) {
-          console.error("Gagal mengambil role:", error);
-          showToast("Terjadi kesalahan saat memuat hak akses.", "error");
-        }
+        } catch (error) { showToast("Terjadi kesalahan saat memuat hak akses.", "error"); }
       } else {
-        setAppUser(null);
-        setUserRole(null);
+        setAppUser(null); setUserRole(null);
       }
       setIsAuthChecking(false);
     });
-
     return () => unsubscribe();
   }, []);
 
-  // Handler Login Asli ke Firebase
+  // === FITUR AUTO LOGOUT JIKA LAMA NON-AKTIF ===
+  useEffect(() => {
+    if (!appUser) return;
+    
+    let inactivityTimeout;
+    const INACTIVITY_TIME_LIMIT = 15 * 60 * 1000; // 15 Menit dalam milidetik
+
+    const resetInactivityTimer = () => {
+      clearTimeout(inactivityTimeout);
+      inactivityTimeout = setTimeout(async () => {
+        await signOut(auth);
+        showToast("Sesi Anda berakhir karena sudah lama tidak ada aktivitas (Auto Logout).", "info");
+      }, INACTIVITY_TIME_LIMIT);
+    };
+
+    // Dengarkan aktivitas di seluruh window
+    const events = ['mousemove', 'mousedown', 'keypress', 'touchmove', 'scroll'];
+    events.forEach(event => window.addEventListener(event, resetInactivityTimer));
+    resetInactivityTimer(); // Inisialisasi awal
+
+    return () => {
+      clearTimeout(inactivityTimeout);
+      events.forEach(event => window.removeEventListener(event, resetInactivityTimer));
+    };
+  }, [appUser]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) return showToast("Email dan Password wajib diisi.", "error");
-    
     setIsLoggingIn(true);
     try {
       await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
       showToast("Berhasil masuk ke sistem!", "success");
       setLoginPassword('');
     } catch (error) {
-      console.error(error);
       let errMsg = "Email atau password salah.";
       if (error.code === 'auth/user-not-found') errMsg = "Akun tidak ditemukan.";
       if (error.code === 'auth/wrong-password') errMsg = "Password yang Anda masukkan salah.";
       if (error.code === 'auth/invalid-credential') errMsg = "Email atau Password tidak valid.";
       if (error.code === 'auth/too-many-requests') errMsg = "Terlalu banyak percobaan. Coba lagi nanti.";
       showToast(errMsg, "error");
-    } finally {
-      setIsLoggingIn(false);
-    }
+    } finally { setIsLoggingIn(false); }
   };
 
   const handleLogout = async () => {
@@ -229,36 +222,21 @@ export default function App() {
     });
   };
 
-  // 2. Listener Database Realtime
   useEffect(() => {
-    if (!firebaseUser || !appUser) {
-      setMerchants([]);
-      setSystemUsers([]);
-      return;
-    }
-    
+    if (!firebaseUser || !appUser) { setMerchants([]); setSystemUsers([]); return; }
     setIsDbLoading(true);
     
-    // Listener Master Data Pedagang
     const merchantsRef = collection(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan');
     const unsubMerchants = onSnapshot(merchantsRef, (snapshot) => {
-      const data = [];
-      snapshot.forEach(doc => data.push(doc.data()));
-      setMerchants(data);
-      setIsDbLoading(false);
-    }, (error) => {
-      console.error("Firestore Listen Error:", error);
-      showToast("Gagal memuat data pedagang.", "error");
-      setIsDbLoading(false);
-    });
+      const data = []; snapshot.forEach(doc => data.push(doc.data()));
+      setMerchants(data); setIsDbLoading(false);
+    }, (error) => { showToast("Gagal memuat data pedagang.", "error"); setIsDbLoading(false); });
 
-    // Listener Akun (Hanya berguna untuk Admin, tapi kita load saja)
     let unsubUsers = () => {};
     if (appUser.role === 'admin') {
        const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'user_roles');
        unsubUsers = onSnapshot(usersRef, (snapshot) => {
-          const uData = [];
-          snapshot.forEach(doc => uData.push(doc.data()));
+          const uData = []; snapshot.forEach(doc => uData.push(doc.data()));
           setSystemUsers(uData);
        });
     }
@@ -269,7 +247,6 @@ export default function App() {
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // Dashboard & Database States
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKategoriDashboard, setFilterKategoriDashboard] = useState('Semua');
   const [filterLokasi, setFilterLokasi] = useState('Semua');
@@ -278,25 +255,21 @@ export default function App() {
   const [importKategori, setImportKategori] = useState('PKL');
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
   
-  // Modal States 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMerchant, setNewMerchant] = useState({ accountId: '', nama: '', keterangan: '', jenisUsaha: '', kategori: 'PKL', tipeTarif: 'HARIAN_FULL', rekeningSumber: '', nik: '', alamatRumah: '', noHp: '', lat: '', lng: '', fotoLapak: '' });
   const [selectedMerchant, setSelectedMerchant] = useState(null);
   const [editModal, setEditModal] = useState({ isOpen: false, data: null });
   const [isCompressing, setIsCompressing] = useState(false);
 
-  // User Management State
   const [newUserReg, setNewUserReg] = useState({ email: '', password: '', role: 'petugas' });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
 
-  // Kalender States
   const [specialDates, setSpecialDates] = useState(defaultHolidays);
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1); 
   const [calYear, setCalYear] = useState(new Date().getFullYear()); 
   const [isSyncing, setIsSyncing] = useState(false);
   const [calendarModal, setCalendarModal] = useState({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' });
 
-  // Map & GPS States
   const [selectedZone, setSelectedZone] = useState('SEMUA AREA');
   const mapRef = useRef(null);
   const markersRef = useRef({});
@@ -305,8 +278,8 @@ export default function App() {
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [isTrackingLocation, setIsTrackingLocation] = useState(false);
   const [isFetchingGps, setIsFetchingGps] = useState(false);
+  const [selectedMapMerchant, setSelectedMapMerchant] = useState(null); // State baru untuk overlay klik peta
 
-  // Generate States
   const [formGenerate, setFormGenerate] = useState({
     kategoriExport: 'Semua', periode: `${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`, keterangan3: 'MAKANAN/MINUMAN',
     jenisTagihan: 'TAG PED', deskripsi: 'TAGIHAN PEDAGANG', tglMulaiBayar: new Date().toISOString().split('T')[0],
@@ -316,46 +289,30 @@ export default function App() {
   const [lastRekonReport, setLastRekonReport] = useState(null);
   const [isXlsxLoaded, setIsXlsxLoaded] = useState(false);
 
-  // FUNGSI KOMPRESI FOTO OTOMATIS
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
+      const reader = new FileReader(); reader.readAsDataURL(file);
       reader.onload = (event) => {
-        const img = new window.Image();
-        img.src = event.target.result;
+        const img = new window.Image(); img.src = event.target.result;
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 600; const MAX_HEIGHT = 600;
+          const canvas = document.createElement('canvas'); const MAX_WIDTH = 600; const MAX_HEIGHT = 600;
           let width = img.width; let height = img.height;
-          if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } 
-          else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
-          canvas.width = width; canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-          resolve(dataUrl);
+          if (width > height) { if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } } else { if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; } }
+          canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
         };
-      };
-      reader.onerror = (error) => reject(error);
+      }; reader.onerror = (error) => reject(error);
     });
   };
 
   const handlePhotoUpload = async (e, mode) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     if (file.size > 5 * 1024 * 1024) { showToast("Peringatan: Ukuran file terlalu besar, kompresi memakan waktu.", "info"); }
-    
     try {
-      setIsCompressing(true);
-      const compressedBase64 = await compressImage(file);
+      setIsCompressing(true); const compressedBase64 = await compressImage(file);
       if (mode === 'ADD') setNewMerchant(prev => ({ ...prev, fotoLapak: compressedBase64 }));
       else setEditModal(prev => ({ ...prev, data: { ...prev.data, fotoLapak: compressedBase64 } }));
-    } catch (err) {
-      showToast("Gagal memproses foto.", "error");
-    } finally {
-      setIsCompressing(false);
-    }
+    } catch (err) { showToast("Gagal memproses foto.", "error"); } finally { setIsCompressing(false); }
   };
 
   const hapusFoto = (mode) => {
@@ -363,70 +320,36 @@ export default function App() {
     else setEditModal(prev => ({ ...prev, data: { ...prev.data, fotoLapak: '' } }));
   };
 
-  // FUNGSI TAMBAH USER / AKUN BARU
   const handleRegisterUser = async (e) => {
-     e.preventDefault();
-     if (userRole !== 'admin') return;
+     e.preventDefault(); if (userRole !== 'admin') return;
      if (!newUserReg.email || !newUserReg.password) return showToast("Email dan password wajib diisi.", "error");
      if (newUserReg.password.length < 6) return showToast("Password minimal 6 karakter.", "error");
 
      setIsCreatingUser(true);
      try {
-       // Buat akun di Firebase Auth menggunakan Secondary App agar Admin tidak logout
        await createUserWithEmailAndPassword(secondaryAuth, newUserReg.email, newUserReg.password);
-       
-       // Catat role-nya di Firestore Database
-       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', newUserReg.email.toLowerCase()), {
-          email: newUserReg.email.toLowerCase(),
-          role: newUserReg.role,
-          createdAt: new Date().toISOString(),
-          createdBy: appUser.email
-       });
-
-       // Logout dari Secondary App
+       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', newUserReg.email.toLowerCase()), { email: newUserReg.email.toLowerCase(), role: newUserReg.role, createdAt: new Date().toISOString(), createdBy: appUser.email });
        await signOut(secondaryAuth);
-
-       showToast(`Akun ${newUserReg.email} berhasil didaftarkan sebagai ${newUserReg.role}!`, "success");
-       setNewUserReg({ email: '', password: '', role: 'petugas' });
-
+       showToast(`Akun ${newUserReg.email} berhasil didaftarkan sebagai ${newUserReg.role}!`, "success"); setNewUserReg({ email: '', password: '', role: 'petugas' });
      } catch (error) {
-       console.error("Gagal buat akun:", error);
-       if (error.code === 'auth/email-already-in-use') showToast("Email tersebut sudah terdaftar.", "error");
-       else showToast("Gagal membuat akun. Pastikan koneksi stabil.", "error");
-     } finally {
-       setIsCreatingUser(false);
-     }
+       if (error.code === 'auth/email-already-in-use') showToast("Email tersebut sudah terdaftar.", "error"); else showToast("Gagal membuat akun. Pastikan koneksi stabil.", "error");
+     } finally { setIsCreatingUser(false); }
   };
 
   const handleDeleteUser = (emailTarget) => {
      if (userRole !== 'admin') return;
      if (emailTarget === appUser.email) return showToast("Anda tidak bisa menghapus akun Anda sendiri.", "error");
-     
      requestConfirm(`Anda yakin ingin mencabut hak akses akun ${emailTarget}? (Akun tidak bisa login ke app ini lagi)`, async () => {
-        try {
-           await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', emailTarget));
-           showToast("Hak akses akun berhasil dicabut.", "success");
-        } catch (error) {
-           showToast("Gagal menghapus akun.", "error");
-        }
+        try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', emailTarget)); showToast("Hak akses akun berhasil dicabut.", "success"); } catch (error) { showToast("Gagal menghapus akun.", "error"); }
      });
   };
 
-  // EXTERNAL LIBRARIES INJECTION (FontAwesome, Excel, Leaflet)
   useEffect(() => {
-    if (!document.getElementById('fa-cdn')) {
-      const linkFA = document.createElement('link'); linkFA.id = 'fa-cdn'; linkFA.rel = 'stylesheet'; linkFA.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'; document.head.appendChild(linkFA);
-    }
-    if (window.XLSX) { setIsXlsxLoaded(true); } else {
-      const scriptXlsx = document.createElement('script'); scriptXlsx.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; scriptXlsx.onload = () => setIsXlsxLoaded(true); document.body.appendChild(scriptXlsx);
-    }
-    if (window.L) { setIsLeafletLoaded(true); } else {
-      const linkLeaflet = document.createElement('link'); linkLeaflet.rel = 'stylesheet'; linkLeaflet.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(linkLeaflet);
-      const scriptLeaflet = document.createElement('script'); scriptLeaflet.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; scriptLeaflet.onload = () => setIsLeafletLoaded(true); document.body.appendChild(scriptLeaflet);
-    }
+    if (!document.getElementById('fa-cdn')) { const linkFA = document.createElement('link'); linkFA.id = 'fa-cdn'; linkFA.rel = 'stylesheet'; linkFA.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'; document.head.appendChild(linkFA); }
+    if (window.XLSX) { setIsXlsxLoaded(true); } else { const scriptXlsx = document.createElement('script'); scriptXlsx.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; scriptXlsx.onload = () => setIsXlsxLoaded(true); document.body.appendChild(scriptXlsx); }
+    if (window.L) { setIsLeafletLoaded(true); } else { const linkLeaflet = document.createElement('link'); linkLeaflet.rel = 'stylesheet'; linkLeaflet.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(linkLeaflet); const scriptLeaflet = document.createElement('script'); scriptLeaflet.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; scriptLeaflet.onload = () => setIsLeafletLoaded(true); document.body.appendChild(scriptLeaflet); }
   }, []);
 
-  // MAPS INITIALIZATION
   useEffect(() => {
     if (activeMenu === 'peta' && isLeafletLoaded) {
       if (!mapRef.current) {
@@ -442,41 +365,41 @@ export default function App() {
     } else {
       if (mapRef.current) {
          if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
-         setIsTrackingLocation(false); mapRef.current.remove(); mapRef.current = null; userMarkerRef.current = null;
+         setIsTrackingLocation(false); mapRef.current.remove(); mapRef.current = null; userMarkerRef.current = null; setSelectedMapMerchant(null);
       }
     }
   }, [activeMenu, isLeafletLoaded]);
 
-  // RENDER PINS
+  // RENDER PINS (Dioptimalkan agar tidak bikin lag/hang)
   useEffect(() => {
     if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
-    Object.values(markersRef.current).forEach(m => m.remove());
-    markersRef.current = {};
+    
+    // Gunakan timeout ringan agar tidak freeze UI saat berpindah tab ke Peta
+    const renderTimeout = setTimeout(() => {
+      Object.values(markersRef.current).forEach(m => m.remove());
+      markersRef.current = {};
 
-    merchants.forEach(m => {
-      if (m.lat && m.lng && (selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')))) {
-        const isNunggak = m.totalTunggakan > 0;
-        const hasPhotoClass = m.fotoLapak ? 'ring-2 ring-blue-500' : 'border-2 border-white';
-        const iconHtml = `<div class="relative flex items-center justify-center w-6 h-6 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.8)] ${isNunggak ? 'bg-red-500' : 'bg-emerald-500'} ${hasPhotoClass} transition-transform hover:scale-125">${isNunggak ? '<span class="absolute inset-0 rounded-full border-2 border-red-400 animate-ping opacity-75"></span>' : ''}</div>`;
-        const customIcon = window.L.divIcon({ html: iconHtml, className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
-        const marker = window.L.marker([m.lat, m.lng], { icon: customIcon }).addTo(mapRef.current);
-        
-        let photoHtml = '';
-        if (m.fotoLapak) photoHtml = `<div style="margin-bottom: 6px; border-radius: 6px; overflow: hidden; height: 80px; width: 100%;"><img src="${m.fotoLapak}" style="width: 100%; height: 100%; object-fit: cover;" /></div>`;
+      merchants.forEach(m => {
+        if (m.lat && m.lng && (selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')))) {
+          const isNunggak = m.totalTunggakan > 0;
+          const hasPhotoClass = m.fotoLapak ? 'ring-2 ring-blue-500' : 'border border-white';
+          // Optimasi: Hapus efek animate-ping agar GPU HP/PC tidak terbebani secara massal
+          const iconHtml = `<div class="relative flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full shadow-md ${isNunggak ? 'bg-red-500' : 'bg-emerald-500'} ${hasPhotoClass} transition-transform hover:scale-125 hover:z-50 cursor-pointer"></div>`;
+          const customIcon = window.L.divIcon({ html: iconHtml, className: '', iconSize: [20, 20], iconAnchor: [10, 10] });
+          const marker = window.L.marker([m.lat, m.lng], { icon: customIcon }).addTo(mapRef.current);
+          
+          // Mengganti bindPopup yang berat dengan Click event khusus ke komponen UI React 
+          marker.on('click', () => {
+             setSelectedMapMerchant(m);
+             mapRef.current.setView([m.lat, m.lng], mapRef.current.getZoom());
+          });
 
-        const popupContent = `
-          <div style="font-family: sans-serif; min-width: 160px; max-width: 220px;">
-            ${photoHtml}
-            <div style="font-size: 10px; font-weight: bold; background: #1e293b; color: white; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px;">${m.accountId}</div>
-            <h4 style="font-weight: 800; font-size: 14px; margin: 0; color: #0f172a; white-space: normal;">${m.nama}</h4>
-            <p style="font-size: 11px; color: #64748b; margin: 2px 0 6px 0; white-space: normal;">${m.keterangan}</p>
-            ${isNunggak ? `<div style="background: #fef2f2; border: 1px solid #fca5a5; padding: 4px; border-radius: 4px;"><p style="font-size: 11px; font-weight: bold; color: #dc2626; margin:0;">Hutang: ${formatRp(m.totalTunggakan)}</p></div>` : `<p style="font-size: 11px; font-weight: bold; color: #059669; margin:0;">✓ Lunas</p>`}
-          </div>
-        `;
-        marker.bindPopup(popupContent);
-        markersRef.current[m.uid] = marker;
-      }
-    });
+          markersRef.current[m.uid] = marker;
+        }
+      });
+    }, 100);
+
+    return () => clearTimeout(renderTimeout);
   }, [merchants, activeMenu, isLeafletLoaded, selectedZone]);
 
   const toggleUserLocation = () => {
@@ -491,16 +414,13 @@ export default function App() {
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          if (userMarkerRef.current) {
-            userMarkerRef.current.setLatLng([latitude, longitude]);
-          } else {
+          if (userMarkerRef.current) { userMarkerRef.current.setLatLng([latitude, longitude]); } else {
             const userIcon = window.L.divIcon({ html: `<div class="relative flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 border-2 border-white shadow-lg"><span class="absolute inset-0 rounded-full border-2 border-blue-400 animate-ping"></span></div>`, className: '', iconSize: [20, 20], iconAnchor: [10, 10] });
             userMarkerRef.current = window.L.marker([latitude, longitude], { icon: userIcon, zIndexOffset: 1000 }).addTo(mapRef.current);
             mapRef.current.flyTo([latitude, longitude], 18, { animate: true, duration: 1.5 });
           }
         },
-        (err) => { showToast("Gagal mengambil lokasi GPS. Pastikan izin lokasi diberikan.", "error"); setIsTrackingLocation(false); },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        (err) => { showToast("Gagal mengambil lokasi GPS. Pastikan izin lokasi diberikan.", "error"); setIsTrackingLocation(false); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
   };
@@ -513,18 +433,16 @@ export default function App() {
            const { latitude, longitude } = pos.coords;
            if (mode === 'ADD') setNewMerchant(prev => ({ ...prev, lat: latitude, lng: longitude }));
            else if (mode === 'EDIT') setEditModal(prev => ({ ...prev, data: { ...prev.data, lat: latitude, lng: longitude } }));
-           setIsFetchingGps(false);
-           showToast("Koordinat berhasil didapatkan!", "success");
+           setIsFetchingGps(false); showToast("Koordinat berhasil didapatkan!", "success");
         },
-        (err) => { showToast("Gagal mendapat sinyal GPS.", "error"); setIsFetchingGps(false); },
-        { enableHighAccuracy: true }
+        (err) => { showToast("Gagal mendapat sinyal GPS.", "error"); setIsFetchingGps(false); }, { enableHighAccuracy: true }
      );
   };
 
   const flyToMerchantOnMap = (m) => {
      if (mapRef.current && m.lat && m.lng) {
         mapRef.current.flyTo([m.lat, m.lng], 19, { animate: true, duration: 1.5 });
-        if (markersRef.current[m.uid]) setTimeout(() => markersRef.current[m.uid].openPopup(), 1500);
+        setSelectedMapMerchant(m);
         if (window.innerWidth < 1024) { const mc = document.getElementById('main-scroll-area'); if(mc) mc.scrollTo({ top: 0, behavior: 'smooth' }); }
      }
   };
@@ -538,18 +456,10 @@ export default function App() {
 
   const saveCalendarDate = (e) => {
     e.preventDefault();
-    if (calendarModal.type !== 'NORMAL' && !calendarModal.name) {
-        return showToast("Nama event wajib diisi untuk hari khusus!", "error");
-    }
+    if (calendarModal.type !== 'NORMAL' && !calendarModal.name) { return showToast("Nama event wajib diisi untuk hari khusus!", "error"); }
     const newDates = { ...specialDates };
-    if (calendarModal.type === 'NORMAL') {
-      delete newDates[calendarModal.dateStr];
-    } else {
-      newDates[calendarModal.dateStr] = { type: calendarModal.type, name: calendarModal.name };
-    }
-    setSpecialDates(newDates);
-    setCalendarModal({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' });
-    showToast("Jadwal kalender berhasil diperbarui.", "success");
+    if (calendarModal.type === 'NORMAL') { delete newDates[calendarModal.dateStr]; } else { newDates[calendarModal.dateStr] = { type: calendarModal.type, name: calendarModal.name }; }
+    setSpecialDates(newDates); setCalendarModal({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' }); showToast("Jadwal kalender berhasil diperbarui.", "success");
   };
 
   const handleSyncHolidays = async () => {
@@ -557,10 +467,7 @@ export default function App() {
     setIsSyncing(true);
     try {
       const response = await fetch(`https://api.allorigins.win/raw?url=https://dayoffapi.vercel.app/api?year=${calYear}`);
-      if (!response.ok) throw new Error('API failed');
-      const data = await response.json();
-      const newSpecialDates = { ...specialDates };
-      let added = 0;
+      if (!response.ok) throw new Error('API failed'); const data = await response.json(); const newSpecialDates = { ...specialDates }; let added = 0;
       data.forEach(item => { if (item.tanggal && item.keterangan) { newSpecialDates[item.tanggal] = { type: 'LIBUR', name: item.is_cuti ? `Cuti Bersama: ${item.keterangan}` : item.keterangan }; added++; } });
       setSpecialDates(newSpecialDates); showToast(`Sinkronisasi sukses! ${added} hari libur ditambahkan.`, "success");
     } catch (error) { showToast(`API Offline. Menggunakan data kalender internal.`, "error"); }
@@ -568,31 +475,20 @@ export default function App() {
   };
 
   const getKalkulasiBulan = (bulan, tahun) => {
-    const daysInMonth = new Date(tahun, bulan, 0).getDate();
-    let hariBiasa = 0, hariRamai = 0, tutupOperasional = 0;
+    const daysInMonth = new Date(tahun, bulan, 0).getDate(); let hariBiasa = 0, hariRamai = 0, tutupOperasional = 0;
     for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(tahun, bulan - 1, i);
-      const dayOfWeek = date.getDay(); 
-      const dateStr = `${tahun}-${String(bulan).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      const date = new Date(tahun, bulan - 1, i); const dayOfWeek = date.getDay(); const dateStr = `${tahun}-${String(bulan).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
       const statusSpesial = specialDates[dateStr]?.type;
-      
-      if (statusSpesial === 'LIBUR' || statusSpesial === 'PEAK') hariRamai++; 
-      else if (statusSpesial === 'TUTUP') tutupOperasional++;
-      else if (statusSpesial === 'BUKA') hariBiasa++;
-      else if (dayOfWeek === 1) tutupOperasional++; 
-      else if (dayOfWeek === 0 || dayOfWeek === 6) hariRamai++; 
-      else hariBiasa++; 
+      if (statusSpesial === 'LIBUR' || statusSpesial === 'PEAK') hariRamai++; else if (statusSpesial === 'TUTUP') tutupOperasional++; else if (statusSpesial === 'BUKA') hariBiasa++; else if (dayOfWeek === 1) tutupOperasional++; else if (dayOfWeek === 0 || dayOfWeek === 6) hariRamai++; else hariBiasa++; 
     }
     return { hariBiasa, hariRamai, tutupOperasional, tarifHarianFull: (hariBiasa * 10000) + (hariRamai * 15000), tarifHarianNonstop: (hariBiasa * 10000) + (tutupOperasional * 10000) + (hariRamai * 15000), tarifWeekendSaja: (hariRamai * 15000) };
   };
   const calStats = useMemo(() => getKalkulasiBulan(calMonth, calYear), [calMonth, calYear, specialDates]);
 
-  // EXCEL & CLOUD OPERATIONS
   const getNominal = (val) => {
     if (!val) return 0;
     if (typeof val === 'number') { let num = val < 1000 ? val * 1000 : val; return Math.round(num); }
-    let str = String(val).trim();
-    if (str.match(/,\d{2}$/)) str = str.replace(/,\d{2}$/, ''); else if (str.match(/\.\d{2}$/)) str = str.replace(/\.\d{2}$/, '');
+    let str = String(val).trim(); if (str.match(/,\d{2}$/)) str = str.replace(/,\d{2}$/, ''); else if (str.match(/\.\d{2}$/)) str = str.replace(/\.\d{2}$/, '');
     let result = parseInt(str.replace(/[^0-9]/g, ''), 10) || 0;
     if (result > 0 && result < 1000) result *= 1000;
     return result;
@@ -601,276 +497,136 @@ export default function App() {
   const parseExcelSafely = (worksheet, requiredKeywords) => {
     const rows = window.XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
     let headerRowIndex = -1, headers = [];
-    for (let i = 0; i < Math.min(rows.length, 20); i++) {
-      const rowStrings = rows[i].map(c => String(c).trim().toUpperCase());
-      if (requiredKeywords.some(req => rowStrings.includes(req.toUpperCase()))) { headerRowIndex = i; headers = rowStrings; break; }
-    }
-    if (headerRowIndex === -1) return null;
-    const data = [];
+    for (let i = 0; i < Math.min(rows.length, 20); i++) { const rowStrings = rows[i].map(c => String(c).trim().toUpperCase()); if (requiredKeywords.some(req => rowStrings.includes(req.toUpperCase()))) { headerRowIndex = i; headers = rowStrings; break; } }
+    if (headerRowIndex === -1) return null; const data = [];
     for (let i = headerRowIndex + 1; i < rows.length; i++) {
-      const row = rows[i];
-      if (row.length === 0 || !row.some(cell => cell !== "")) continue; 
-      const obj = {}; headers.forEach((h, idx) => { if (h) obj[h] = row[idx]; }); data.push(obj);
+      const row = rows[i]; if (row.length === 0 || !row.some(cell => cell !== "")) continue; const obj = {}; headers.forEach((h, idx) => { if (h) obj[h] = row[idx]; }); data.push(obj);
     }
     return data;
   };
 
-  // CLOUD WRITE: IMPORT MASTER
   const handleImportMaster = (e) => {
-    if (userRole !== 'admin') return;
-    const file = e.target.files[0];
-    if (!file) return;
-
+    if (userRole !== 'admin') return; const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = async (event) => {
       showToast("Sedang memproses Excel dan sinkronisasi ke Cloud...", "info");
       try {
-        const data = new Uint8Array(event.target.result);
-        const workbook = window.XLSX.read(data, { type: 'array' });
-        let foundData = null;
-        for (const sheetName of workbook.SheetNames) {
-          const parsed = parseExcelSafely(workbook.Sheets[sheetName], ['ACCOUNT ID', 'ID', 'NO LOKSEM', 'NAMA', 'NAMA NASABAH']);
-          if (parsed && parsed.length > 0) { foundData = parsed; break; }
-        }
+        const data = new Uint8Array(event.target.result); const workbook = window.XLSX.read(data, { type: 'array' }); let foundData = null;
+        for (const sheetName of workbook.SheetNames) { const parsed = parseExcelSafely(workbook.Sheets[sheetName], ['ACCOUNT ID', 'ID', 'NO LOKSEM', 'NAMA', 'NAMA NASABAH']); if (parsed && parsed.length > 0) { foundData = parsed; break; } }
         if (!foundData) return showToast("Struktur tabel ID/Nama tidak ditemukan di Excel.", "error");
 
-        const batchPromises = [];
-        let addedCount = 0; let updatedCount = 0;
-
+        const batchPromises = []; let addedCount = 0; let updatedCount = 0;
         foundData.forEach(row => {
-          const rawId = row['ACCOUNT ID'] || row['ID'] || row['ID TAGIHAN'] || row['NO LOKSEM'];
-          if (!rawId || rawId === 'undefined') return;
-          
+          const rawId = row['ACCOUNT ID'] || row['ID'] || row['ID TAGIHAN'] || row['NO LOKSEM']; if (!rawId || rawId === 'undefined') return;
           const nama = row['NAMA NASABAH'] || row['NAMA '] || row['NAMA'] || row['NAMA PEDAGANG'] || '-';
           const allText = Object.values(row).join(' ').toUpperCase();
           const lokasiDetail = row['KETERANGAN 1'] || row['LOKASI'] || row['ALAMAT'] || '-';
           const jenisUsaha = row['JENIS USAHA'] || row['USAHA'] || row['JENIS PRODUK'] || row['PRODUK'] || row['KETERANGAN 3'] || '-';
-          
-          const safeRawId = String(rawId).replace(/\//g, '-').trim();
-          const safeLokasi = String(lokasiDetail).replace(/\//g, '-').trim();
-          const uid = safeRawId + '_' + safeLokasi;
-
+          const safeRawId = String(rawId).replace(/\//g, '-').trim(); const safeLokasi = String(lokasiDetail).replace(/\//g, '-').trim(); const uid = safeRawId + '_' + safeLokasi;
           const existingIdx = merchants.findIndex(ex => ex.uid === uid);
 
           if (existingIdx === -1) {
-            let latVal = row['LATITUDE'] || row['LAT'] || '';
-            let lngVal = row['LONGITUDE'] || row['LNG'] || row['LON'] || '';
+            let latVal = row['LATITUDE'] || row['LAT'] || ''; let lngVal = row['LONGITUDE'] || row['LNG'] || row['LON'] || '';
             if (!latVal || !lngVal) {
-               const locUp = String(lokasiDetail).toUpperCase();
-               let baseLat = -6.311545, baseLng = 106.820067;
-               if (locUp.includes('UTARA') || locUp.includes('UTM')) { baseLat = -6.305602; baseLng = 106.820120; }
-               else if (locUp.includes('SELATAN')) { baseLat = -6.317586; baseLng = 106.820258; }
-               else if (locUp.includes('BARAT') || locUp.includes('PRIMATA')) { baseLat = -6.311354; baseLng = 106.815555; }
-               else if (locUp.includes('TIMUR') || locUp.includes('BURUNG')) { baseLat = -6.311456; baseLng = 106.824701; }
-               else if (locUp.includes('DANAU') || locUp.includes('RAKIT')) { baseLat = -6.313583; baseLng = 106.822084; }
-               else if (locUp.includes('GAJAH') || locUp.includes('KOMODO')) { baseLat = -6.308709; baseLng = 106.822867; }
+               const locUp = String(lokasiDetail).toUpperCase(); let baseLat = -6.311545, baseLng = 106.820067;
+               if (locUp.includes('UTARA') || locUp.includes('UTM')) { baseLat = -6.305602; baseLng = 106.820120; } else if (locUp.includes('SELATAN')) { baseLat = -6.317586; baseLng = 106.820258; } else if (locUp.includes('BARAT') || locUp.includes('PRIMATA')) { baseLat = -6.311354; baseLng = 106.815555; } else if (locUp.includes('TIMUR') || locUp.includes('BURUNG')) { baseLat = -6.311456; baseLng = 106.824701; } else if (locUp.includes('DANAU') || locUp.includes('RAKIT')) { baseLat = -6.313583; baseLng = 106.822084; } else if (locUp.includes('GAJAH') || locUp.includes('KOMODO')) { baseLat = -6.308709; baseLng = 106.822867; }
                latVal = baseLat + (Math.random() - 0.5) * 0.003; lngVal = baseLng + (Math.random() - 0.5) * 0.003;
             }
-
             let tipeTarif = 'TETAP'; 
-            if (importKategori === 'LISTRIK') tipeTarif = 'TETAP';
-            else if (allText.includes('SABTU') || allText.includes('MINGGU') || allText.includes('BESAR')) tipeTarif = 'HARIAN_WEEKEND';
-            else if (allText.includes('SETIAP HARI') || importKategori === 'LOKSEM') tipeTarif = importKategori === 'LOKSEM' ? 'HARIAN_FULL_NONSTOP' : 'HARIAN_FULL';
-            else if (importKategori === 'TIKAR') tipeTarif = 'HARIAN_WEEKEND';
-            else if (importKategori === 'PKL' || importKategori === 'JURU FOTO') tipeTarif = 'HARIAN_FULL';
+            if (importKategori === 'LISTRIK') tipeTarif = 'TETAP'; else if (allText.includes('SABTU') || allText.includes('MINGGU') || allText.includes('BESAR')) tipeTarif = 'HARIAN_WEEKEND'; else if (allText.includes('SETIAP HARI') || importKategori === 'LOKSEM') tipeTarif = importKategori === 'LOKSEM' ? 'HARIAN_FULL_NONSTOP' : 'HARIAN_FULL'; else if (importKategori === 'TIKAR') tipeTarif = 'HARIAN_WEEKEND'; else if (importKategori === 'PKL' || importKategori === 'JURU FOTO') tipeTarif = 'HARIAN_FULL';
 
             let tagihan = getNominal(row['JUMLAH TAGIHAN'] || row['JUMLAH BAYAR'] || row['TAGIHAN'] || 0);
             if (tagihan === 0 && importKategori !== 'LISTRIK') { tagihan = parseInt(defaultTagihanInput, 10) || 285000; }
-
-            const newM = {
-              uid, accountId: String(rawId).trim(), nama, keterangan: lokasiDetail, jenisUsaha, 
-              nik: row['NIK'] || row['NO KTP'] || '-', alamatRumah: row['ALAMAT RUMAH'] || '-', 
-              noHp: row['NO HP'] || row['HP'] || '-', fotoLapak: '', lat: latVal, lng: lngVal, 
-              rekeningSumber: row['REKENING SUMBER'] || row['NO REKENING'] || '', tagihanTetapBulanan: tagihan,
-              tipeTarif, totalTunggakan: 0, bulanMenunggak: [], bulanLunas: [], riwayatTagihan: [], 
-              statusTerakhir: 'Aktif - Menunggu', kategori: importKategori
-            };
-            batchPromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', uid), newM));
-            addedCount++;
+            const newM = { uid, accountId: String(rawId).trim(), nama, keterangan: lokasiDetail, jenisUsaha, nik: row['NIK'] || row['NO KTP'] || '-', alamatRumah: row['ALAMAT RUMAH'] || '-', noHp: row['NO HP'] || row['HP'] || '-', fotoLapak: '', lat: latVal, lng: lngVal, rekeningSumber: row['REKENING SUMBER'] || row['NO REKENING'] || '', tagihanTetapBulanan: tagihan, tipeTarif, totalTunggakan: 0, bulanMenunggak: [], bulanLunas: [], riwayatTagihan: [], statusTerakhir: 'Aktif - Menunggu', kategori: importKategori };
+            batchPromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', uid), newM)); addedCount++;
           } else {
              const ex = merchants[existingIdx];
              if (importKategori === 'LISTRIK' || ex.tagihanTetapBulanan > 0) {
                 const updatedM = { ...ex, tagihanTetapBulanan: ex.tagihanTetapBulanan, tipeTarif: importKategori === 'LISTRIK' ? 'TETAP' : ex.tipeTarif };
-                batchPromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', uid), updatedM));
-                updatedCount++;
+                batchPromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', uid), updatedM)); updatedCount++;
              }
           }
         });
-
-        await Promise.all(batchPromises);
-        showToast(`Import Selesai! ${addedCount} Baru, ${updatedCount} Diperbarui ke Cloud.`, "success");
-      } catch (err) { 
-        console.error("ERROR FIREBASE SAAT IMPORT:", err);
-        showToast("Gagal membaca Excel/Upload ke Cloud.", "error"); 
-      }
-    };
-    reader.readAsArrayBuffer(file); e.target.value = null;
+        await Promise.all(batchPromises); showToast(`Import Selesai! ${addedCount} Baru, ${updatedCount} Diperbarui ke Cloud.`, "success");
+      } catch (err) { showToast("Gagal membaca Excel/Upload ke Cloud.", "error"); }
+    }; reader.readAsArrayBuffer(file); e.target.value = null;
   };
 
-  // CLOUD WRITE: HAPUS SEMUA
   const handleClearCache = () => {
     if (userRole !== 'admin') return;
     requestConfirm("PERINGATAN: Anda akan menghapus SELURUH data pedagang dari Cloud Database. Lanjutkan?", async () => {
        showToast("Sedang menghapus data dari Cloud...", "info");
-       try {
-         const deletePromises = merchants.map(m => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', m.uid)));
-         await Promise.all(deletePromises);
-         showToast("Database Cloud berhasil dikosongkan!", "success");
-       } catch (err) {
-         showToast("Terjadi kesalahan saat menghapus data.", "error");
-       }
+       try { const deletePromises = merchants.map(m => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', m.uid))); await Promise.all(deletePromises); showToast("Database Cloud berhasil dikosongkan!", "success"); } catch (err) { showToast("Terjadi kesalahan saat menghapus data.", "error"); }
     });
   };
 
-  // CLOUD WRITE: TAMBAH MANUAL
   const handleAddMerchantManual = async (e) => {
-    e.preventDefault();
-    if (userRole !== 'admin') return;
+    e.preventDefault(); if (userRole !== 'admin') return;
     if(!newMerchant.accountId || !newMerchant.nama) return showToast('ID dan Nama wajib diisi!', "error");
-    
-    const safeRawId = String(newMerchant.accountId).replace(/\//g, '-').trim();
-    const safeLokasi = String(newMerchant.keterangan).replace(/\//g, '-').trim();
-    const newUid = safeRawId + '_' + safeLokasi;
-
+    const safeRawId = String(newMerchant.accountId).replace(/\//g, '-').trim(); const safeLokasi = String(newMerchant.keterangan).replace(/\//g, '-').trim(); const newUid = safeRawId + '_' + safeLokasi;
     if(merchants.find(m => m.uid === newUid)) return showToast('ID dengan lokasi tersebut sudah terdaftar!', "error");
-    
-    const finalData = {
-      ...newMerchant, uid: newUid, jenisUsaha: newMerchant.jenisUsaha || '-', nik: newMerchant.nik || '-',
-      alamatRumah: newMerchant.alamatRumah || '-', noHp: newMerchant.noHp || '-',
-      lat: newMerchant.lat || (-6.311545 + (Math.random() - 0.5) * 0.003), lng: newMerchant.lng || (106.820067 + (Math.random() - 0.5) * 0.003),
-      tagihanTetapBulanan: newMerchant.kategori === 'TIKAR' ? 115000 : newMerchant.kategori === 'JURU FOTO' ? 390000 : 285000,
-      totalTunggakan: 0, bulanMenunggak: [], bulanLunas: [], riwayatTagihan: [], statusTerakhir: 'Aktif - Baru'
-    };
-
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', newUid), finalData);
-      setShowAddModal(false);
-      setNewMerchant({ accountId: '', nama: '', keterangan: '', jenisUsaha: '', kategori: 'PKL', tipeTarif: 'HARIAN_FULL', rekeningSumber: '', nik: '', alamatRumah: '', noHp: '', lat: '', lng: '', fotoLapak: '' });
-      showToast('Data & Foto berhasil disimpan ke Cloud!', "success");
-    } catch(err) { showToast('Gagal menyimpan ke Cloud.', "error"); }
+    const finalData = { ...newMerchant, uid: newUid, jenisUsaha: newMerchant.jenisUsaha || '-', nik: newMerchant.nik || '-', alamatRumah: newMerchant.alamatRumah || '-', noHp: newMerchant.noHp || '-', lat: newMerchant.lat || (-6.311545 + (Math.random() - 0.5) * 0.003), lng: newMerchant.lng || (106.820067 + (Math.random() - 0.5) * 0.003), tagihanTetapBulanan: newMerchant.kategori === 'TIKAR' ? 115000 : newMerchant.kategori === 'JURU FOTO' ? 390000 : 285000, totalTunggakan: 0, bulanMenunggak: [], bulanLunas: [], riwayatTagihan: [], statusTerakhir: 'Aktif - Baru' };
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', newUid), finalData); setShowAddModal(false); setNewMerchant({ accountId: '', nama: '', keterangan: '', jenisUsaha: '', kategori: 'PKL', tipeTarif: 'HARIAN_FULL', rekeningSumber: '', nik: '', alamatRumah: '', noHp: '', lat: '', lng: '', fotoLapak: '' }); showToast('Data & Foto berhasil disimpan ke Cloud!', "success"); } catch(err) { showToast('Gagal menyimpan ke Cloud.', "error"); }
   };
 
-  // CLOUD WRITE: EDIT MANUAL (TERBUKA UNTUK PETUGAS)
   const handleEditSave = async (e) => {
-    e.preventDefault();
-    if (!userRole) return;
+    e.preventDefault(); if (!userRole) return;
     if (!editModal.data.accountId || !editModal.data.nama) return showToast('ID dan Nama wajib diisi!', "error");
-    
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', editModal.data.uid), editModal.data);
-      setEditModal({ isOpen: false, data: null });
-      showToast('Perubahan berhasil disimpan ke Cloud.', "success");
-    } catch (err) { showToast('Gagal update ke Cloud.', "error"); }
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', editModal.data.uid), editModal.data); setEditModal({ isOpen: false, data: null }); showToast('Perubahan berhasil disimpan ke Cloud.', "success"); } catch (err) { showToast('Gagal update ke Cloud.', "error"); }
   };
 
-  // CLOUD WRITE: GANTI TARIF
   const gantiTipeTarif = async (merchant, newTipe) => {
     if (userRole !== 'admin') return showToast("Hanya admin yang dapat merubah tarif.", "error");
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', merchant.uid), { ...merchant, tipeTarif: newTipe });
-    } catch(err) { showToast('Gagal mengganti tarif.', "error"); }
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', merchant.uid), { ...merchant, tipeTarif: newTipe }); } catch(err) { showToast('Gagal mengganti tarif.', "error"); }
   };
 
-  // CLOUD WRITE: HAPUS SATUAN
   const handleDeleteSatuan = (merchant) => {
     if (userRole !== 'admin') return;
-    requestConfirm(`Hapus pedagang ${merchant.nama} dari Cloud Database?`, async () => {
-       try {
-         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', merchant.uid));
-         showToast("Data berhasil dihapus.", "success");
-       } catch(err) { showToast("Gagal menghapus data.", "error"); }
-    });
+    requestConfirm(`Hapus pedagang ${merchant.nama} dari Cloud Database?`, async () => { try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', merchant.uid)); showToast("Data berhasil dihapus.", "success"); } catch(err) { showToast("Gagal menghapus data.", "error"); } });
   }
 
-  // GENERATE EXCEL (Lokal)
   const handleGenerateExcel = () => {
-    if (userRole !== 'admin') return;
-    let targetMerchants = formGenerate.kategoriExport !== 'Semua' ? merchants.filter(m => m.kategori === formGenerate.kategoriExport) : merchants;
+    if (userRole !== 'admin') return; let targetMerchants = formGenerate.kategoriExport !== 'Semua' ? merchants.filter(m => m.kategori === formGenerate.kategoriExport) : merchants;
     if (targetMerchants.length === 0) return showToast(`Tidak ada data untuk kategori ini.`, "error");
-
-    const [mmStr, yyyyStr] = formGenerate.periode.split('/');
-    const targetBulan = parseInt(mmStr, 10) || calMonth; const targetTahun = parseInt(yyyyStr, 10) || calYear;
-    const calc = getKalkulasiBulan(targetBulan, targetTahun);
-    const idCountMap = {}; targetMerchants.forEach(m => { idCountMap[m.accountId] = (idCountMap[m.accountId] || 0) + 1; });
-    const currentIdCount = {};
-
+    const [mmStr, yyyyStr] = formGenerate.periode.split('/'); const targetBulan = parseInt(mmStr, 10) || calMonth; const targetTahun = parseInt(yyyyStr, 10) || calYear; const calc = getKalkulasiBulan(targetBulan, targetTahun);
+    const idCountMap = {}; targetMerchants.forEach(m => { idCountMap[m.accountId] = (idCountMap[m.accountId] || 0) + 1; }); const currentIdCount = {};
     const dataToExport = targetMerchants.map(m => {
-      let t = m.tagihanTetapBulanan;
-      if (m.tipeTarif === 'HARIAN_FULL') t = calc.tarifHarianFull;
-      else if (m.tipeTarif === 'HARIAN_FULL_NONSTOP') t = calc.tarifHarianNonstop;
-      else if (m.tipeTarif === 'HARIAN_WEEKEND') t = calc.tarifWeekendSaja;
-
-      currentIdCount[m.accountId] = (currentIdCount[m.accountId] || 0) + 1;
-      let periodeFinal = formGenerate.periode;
-      if (idCountMap[m.accountId] > 1) { periodeFinal = `${formGenerate.periode}  ${currentIdCount[m.accountId]}`; }
-
-      return {
-        "ACCOUNT ID": m.accountId, "NAMA NASABAH": m.nama, "KETERANGAN 1": m.keterangan, "KETERANGAN 2": periodeFinal, 
-        "KETERANGAN 3": (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha : formGenerate.keterangan3,
-        "JENIS TAGIHAN": formGenerate.jenisTagihan, "DESKRIPSI": formGenerate.deskripsi,
-        "NO URUT BAYAR": "1", "METODE BAYAR": "AUTODEBET", "JUMLAH TAGIHAN": t + m.totalTunggakan, 
-        "TANGGAL MULAI BAYAR": formGenerate.tglMulaiBayar, "TANGGAL JATUH TEMPO": formGenerate.tglJatuhTempo,
-        "JENIS REKENING SUMBER": m.rekeningSumber ? 'KONVEN' : '', "REKENING SUMBER": m.rekeningSumber,
-        "JENIS REKENING TUJUAN": formGenerate.jenisRekTujuan, "REKENING TUJUAN": formGenerate.rekTujuan, 
-        "KODE PLAN": formGenerate.kodePlan, "NO HP": (m.noHp && m.noHp !== '-') ? m.noHp : '', "EMAIL": formGenerate.defaultEmail,
-        "LATITUDE": m.lat, "LONGITUDE": m.lng
-      };
+      let t = m.tagihanTetapBulanan; if (m.tipeTarif === 'HARIAN_FULL') t = calc.tarifHarianFull; else if (m.tipeTarif === 'HARIAN_FULL_NONSTOP') t = calc.tarifHarianNonstop; else if (m.tipeTarif === 'HARIAN_WEEKEND') t = calc.tarifWeekendSaja;
+      currentIdCount[m.accountId] = (currentIdCount[m.accountId] || 0) + 1; let periodeFinal = formGenerate.periode; if (idCountMap[m.accountId] > 1) { periodeFinal = `${formGenerate.periode}  ${currentIdCount[m.accountId]}`; }
+      return { "ACCOUNT ID": m.accountId, "NAMA NASABAH": m.nama, "KETERANGAN 1": m.keterangan, "KETERANGAN 2": periodeFinal, "KETERANGAN 3": (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha : formGenerate.keterangan3, "JENIS TAGIHAN": formGenerate.jenisTagihan, "DESKRIPSI": formGenerate.deskripsi, "NO URUT BAYAR": "1", "METODE BAYAR": "AUTODEBET", "JUMLAH TAGIHAN": t + m.totalTunggakan, "TANGGAL MULAI BAYAR": formGenerate.tglMulaiBayar, "TANGGAL JATUH TEMPO": formGenerate.tglJatuhTempo, "JENIS REKENING SUMBER": m.rekeningSumber ? 'KONVEN' : '', "REKENING SUMBER": m.rekeningSumber, "JENIS REKENING TUJUAN": formGenerate.jenisRekTujuan, "REKENING TUJUAN": formGenerate.rekTujuan, "KODE PLAN": formGenerate.kodePlan, "NO HP": (m.noHp && m.noHp !== '-') ? m.noHp : '', "EMAIL": formGenerate.defaultEmail, "LATITUDE": m.lat, "LONGITUDE": m.lng };
     });
-
-    const ws = window.XLSX.utils.json_to_sheet(dataToExport); const wb = window.XLSX.utils.book_new(); 
-    window.XLSX.utils.book_append_sheet(wb, ws, "Sheet1"); window.XLSX.writeFile(wb, `UPLOAD_JAKONE_${formGenerate.jenisTagihan.replace(/\s+/g, '')}_${formGenerate.periode.replace('/', '_')}.xlsx`);
+    const ws = window.XLSX.utils.json_to_sheet(dataToExport); const wb = window.XLSX.utils.book_new(); window.XLSX.utils.book_append_sheet(wb, ws, "Sheet1"); window.XLSX.writeFile(wb, `UPLOAD_JAKONE_${formGenerate.jenisTagihan.replace(/\s+/g, '')}_${formGenerate.periode.replace('/', '_')}.xlsx`);
   };
 
-  // CLOUD WRITE: REKONSILIASI
   const handleUploadReport = (e) => {
-    if (userRole !== 'admin') return;
-    const file = e.target.files[0];
-    if (!file) return;
+    if (userRole !== 'admin') return; const file = e.target.files[0]; if (!file) return;
     if (merchants.length === 0) { e.target.value = null; return showToast("Database kosong.", "error"); }
-
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const data = new Uint8Array(event.target.result);
-        const workbook = window.XLSX.read(data, { type: 'array' });
-        let reportData = null;
-        for (const sheetName of workbook.SheetNames) {
-          const parsed = parseExcelSafely(workbook.Sheets[sheetName], ['RESPONSE CODE', 'RESPONSE DESCRIPTION', 'JUMLAH BAYAR']);
-          if (parsed && parsed.length > 0) { reportData = parsed; break; }
-        }
+        const data = new Uint8Array(event.target.result); const workbook = window.XLSX.read(data, { type: 'array' }); let reportData = null;
+        for (const sheetName of workbook.SheetNames) { const parsed = parseExcelSafely(workbook.Sheets[sheetName], ['RESPONSE CODE', 'RESPONSE DESCRIPTION', 'JUMLAH BAYAR']); if (parsed && parsed.length > 0) { reportData = parsed; break; } }
         if (!reportData) return showToast("Gagal: Kolom RESPONSE CODE tidak ada.", "error");
 
-        let logs = { sukses: 0, gagal: 0, uangMasuk: 0, uangGagal: 0 };
-        const batchPromises = [];
-        
+        let logs = { sukses: 0, gagal: 0, uangMasuk: 0, uangGagal: 0 }; const batchPromises = [];
         merchants.forEach(merchant => {
           const transaksiPedagang = reportData.filter(r => {
             const matchId = String(r['ACCOUNT ID']).trim() === String(merchant.accountId).trim() || String(r['ID TAGIHAN']).trim() === String(merchant.accountId).trim();
-            if (!matchId) return false; 
-            if (!r['KETERANGAN 1']) return true; 
-
-            let locBank = String(r['KETERANGAN 1']).replace(/\s+/g, ' ').trim().toUpperCase();
-            let locMaster = String(merchant.keterangan).replace(/\s+/g, ' ').trim().toUpperCase();
-            locBank = locBank.replace(/^P\.\s*/, 'PINTU ').replace(/\bP\.\s*/, 'PINTU ');
-            locMaster = locMaster.replace(/^P\.\s*/, 'PINTU ').replace(/\bP\.\s*/, 'PINTU ');
-
+            if (!matchId) return false; if (!r['KETERANGAN 1']) return true; 
+            let locBank = String(r['KETERANGAN 1']).replace(/\s+/g, ' ').trim().toUpperCase(); let locMaster = String(merchant.keterangan).replace(/\s+/g, ' ').trim().toUpperCase();
+            locBank = locBank.replace(/^P\.\s*/, 'PINTU ').replace(/\bP\.\s*/, 'PINTU '); locMaster = locMaster.replace(/^P\.\s*/, 'PINTU ').replace(/\bP\.\s*/, 'PINTU ');
             if (locBank === locMaster || locBank.includes(locMaster) || locMaster.includes(locBank)) return true; 
             if (merchant.kategori === 'JURU FOTO' || merchant.kategori === 'TIKAR' || merchant.kategori === 'LISTRIK') return true;
             return false;
           });
           
           if (transaksiPedagang.length === 0) return;
-
-          let newRiwayat = [...(merchant.riwayatTagihan || [])];
-          let updated = false;
+          let newRiwayat = [...(merchant.riwayatTagihan || [])]; let updated = false;
 
           transaksiPedagang.forEach(hasilBank => {
             let periodeLaporan = String(hasilBank['PERIODE'] || hasilBank['KETERANGAN 2'] || formGenerate.periode).trim().replace(/\s+\d+$/, '');
-            const nomTagihanLaporan = getNominal(hasilBank['JUMLAH TAGIHAN']);
-            const nomBayarLaporan = getNominal(hasilBank['JUMLAH BAYAR']);
-            const resCode = String(hasilBank['RESPONSE CODE']).trim();
-            const descBank = String(hasilBank['RESPONSE DESCRIPTION'] || '').toUpperCase();
-            
+            const nomTagihanLaporan = getNominal(hasilBank['JUMLAH TAGIHAN']); const nomBayarLaporan = getNominal(hasilBank['JUMLAH BAYAR']);
+            const resCode = String(hasilBank['RESPONSE CODE']).trim(); const descBank = String(hasilBank['RESPONSE DESCRIPTION'] || '').toUpperCase();
             const isLunas = resCode === '00' || resCode === '0' || descBank.includes('SUKSES');
             const tglTransaksi = hasilBank['TANGGAL TRANSAKSI'] || new Date().toLocaleDateString('id-ID');
             const existingIdx = newRiwayat.findIndex(r => r.periode === periodeLaporan);
@@ -878,8 +634,7 @@ export default function App() {
             const record = { periode: periodeLaporan, nominalTagihan: nomTagihanLaporan, nominalBayar: isLunas ? (nomBayarLaporan || nomTagihanLaporan) : 0, status: isLunas ? 'LUNAS' : 'MENUNGGAK', tglUpdate: tglTransaksi, keterangan: isLunas ? '✓ Lunas Autodebet' : `✗ ${hasilBank['RESPONSE DESCRIPTION'] || 'Gagal Debet'}` };
 
             if (isLunas) { logs.sukses++; logs.uangMasuk += record.nominalBayar; } else { logs.gagal++; logs.uangGagal += record.nominalTagihan; }
-            if(existingIdx >= 0) { if (newRiwayat[existingIdx].status !== 'LUNAS' || isLunas) { newRiwayat[existingIdx] = record; updated = true; } } 
-            else { newRiwayat.push(record); updated = true; }
+            if(existingIdx >= 0) { if (newRiwayat[existingIdx].status !== 'LUNAS' || isLunas) { newRiwayat[existingIdx] = record; updated = true; } } else { newRiwayat.push(record); updated = true; }
           });
 
           if (updated) {
@@ -887,30 +642,20 @@ export default function App() {
             const newBulanLunas = [...new Set(newRiwayat.filter(r => r.status === 'LUNAS').map(r => r.periode))].sort((a,b) => b.localeCompare(a));
             const newTotalTunggakan = newRiwayat.filter(r => r.status === 'MENUNGGAK').reduce((sum, r) => sum + r.nominalTagihan, 0);
             let statusTerakhirStr = newTotalTunggakan === 0 ? 'Lunas Semua' : `Hutang ${newBulanMenunggak.length} Bulan`;
-            
-            batchPromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', merchant.uid), {
-              ...merchant, riwayatTagihan: newRiwayat, statusTerakhir: statusTerakhirStr, totalTunggakan: newTotalTunggakan, bulanMenunggak: newBulanMenunggak, bulanLunas: newBulanLunas
-            }));
+            batchPromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merchants_ragunan', merchant.uid), { ...merchant, riwayatTagihan: newRiwayat, statusTerakhir: statusTerakhirStr, totalTunggakan: newTotalTunggakan, bulanMenunggak: newBulanMenunggak, bulanLunas: newBulanLunas }));
           }
         });
 
         if (batchPromises.length > 0) {
-           showToast("Sedang sinkronisasi hasil rekon ke Cloud...", "info");
-           await Promise.all(batchPromises);
-           setLastRekonReport(logs); setActiveMenu('dashboard'); 
-           showToast(`Rekon Cloud Selesai! Berhasil: ${logs.sukses}, Gagal: ${logs.gagal}`, "success");
-        } else {
-           showToast("Tidak ada data baru yang perlu diupdate.", "info");
-        }
+           showToast("Sedang sinkronisasi hasil rekon ke Cloud...", "info"); await Promise.all(batchPromises); setLastRekonReport(logs); setActiveMenu('dashboard'); showToast(`Rekon Cloud Selesai! Berhasil: ${logs.sukses}, Gagal: ${logs.gagal}`, "success");
+        } else { showToast("Tidak ada data baru yang perlu diupdate.", "info"); }
       } catch (err) { showToast("Gagal memproses file rekon.", "error"); }
-    };
-    reader.readAsArrayBuffer(file); e.target.value = null;
+    }; reader.readAsArrayBuffer(file); e.target.value = null;
   };
 
   const mapZonesData = [
-    { id: 'SEMUA AREA', name: 'Tampilkan Semua' }, { id: 'UTARA', name: 'Pintu Utara & Utama' },
-    { id: 'SELATAN', name: 'Area Pintu Selatan' }, { id: 'BARAT', name: 'Pintu Barat / Schmutzer' },
-    { id: 'TIMUR', name: 'Pintu Timur / Burung' }, { id: 'INFORMASI', name: 'Pusat Informasi & Plaza' },
+    { id: 'SEMUA AREA', name: 'Tampilkan Semua' }, { id: 'UTARA', name: 'Pintu Utara & Utama' }, { id: 'SELATAN', name: 'Area Pintu Selatan' },
+    { id: 'BARAT', name: 'Pintu Barat / Schmutzer' }, { id: 'TIMUR', name: 'Pintu Timur / Burung' }, { id: 'INFORMASI', name: 'Pusat Informasi & Plaza' },
     { id: 'DANAU', name: 'Danau & Rakit' }, { id: 'GAJAH', name: 'Area Gajah & Komodo' },
   ];
 
@@ -931,9 +676,7 @@ export default function App() {
     if (sortConfig.key) {
       filtered.sort((a, b) => {
         const valA = String(a[sortConfig.key] || '').toLowerCase(); const valB = String(b[sortConfig.key] || '').toLowerCase();
-        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1; if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1; return 0;
       });
     }
     return filtered;
@@ -1069,7 +812,6 @@ export default function App() {
                 
                 <button onClick={() => handleMenuClick('peta')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'peta' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><MapIcon className="w-5 h-5" /> Peta Sebaran Real-Time</button>
                 
-                {/* TERBUKA UNTUK ADMIN & PETUGAS */}
                 <button onClick={() => handleMenuClick('kelola-data')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'kelola-data' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><Contact className="w-5 h-5" /> Kelola Master Data</button>
                 
                 {userRole === 'admin' && (
@@ -1344,7 +1086,7 @@ export default function App() {
                 )}
 
                 {activeMenu === 'peta' && (
-                  <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-8rem)] animate-in fade-in">
+                  <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-8rem)] animate-in fade-in relative">
                     <div className="w-full h-[55vh] lg:h-auto lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
                        <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 flex justify-between items-start z-[1000] pointer-events-none gap-2">
                           <div className="bg-white/90 backdrop-blur px-3 py-2 sm:px-4 sm:py-3 rounded-xl shadow-lg border border-slate-200 pointer-events-auto max-w-[60%] sm:max-w-none">
@@ -1355,17 +1097,56 @@ export default function App() {
                           </div>
                           <div className="bg-white/90 backdrop-blur p-2 sm:p-3 rounded-xl shadow-lg border border-slate-200 flex flex-col gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
                              <div className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[11px] font-bold text-slate-700">
-                                <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-500 border border-white shadow-sm shrink-0"></span> <span className="hidden sm:inline">Pembayaran Lancar</span><span className="sm:hidden">Lancar</span>
+                                <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-500 border border-emerald-600 shadow-sm shrink-0"></span> <span className="hidden sm:inline">Pembayaran Lancar</span><span className="sm:hidden">Lancar</span>
                              </div>
                              <div className="flex items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[11px] font-bold text-slate-700">
-                                <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 border border-white shadow-sm animate-pulse shrink-0"></span> <span className="hidden sm:inline">Ada Tunggakan</span><span className="sm:hidden">Nunggak</span>
+                                <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 border border-red-600 shadow-sm shrink-0"></span> <span className="hidden sm:inline">Ada Tunggakan</span><span className="sm:hidden">Nunggak</span>
                              </div>
                           </div>
                        </div>
 
-                       <button onClick={toggleUserLocation} className={`absolute bottom-20 right-2 sm:bottom-24 sm:right-4 z-[1000] p-3 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.15)] border-2 transition-all flex items-center justify-center ${isTrackingLocation ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`} title="Lacak Lokasi Saya">
+                       <button onClick={toggleUserLocation} className={`absolute bottom-6 right-2 sm:bottom-6 sm:right-4 z-[1000] p-3 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.15)] border-2 transition-all flex items-center justify-center ${isTrackingLocation ? 'bg-blue-600 text-white border-blue-400' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`} title="Lacak Lokasi Saya">
                           {isTrackingLocation ? <MapPinOff className="w-6 h-6" /> : <Crosshair className="w-6 h-6" />}
                        </button>
+
+                       {/* KARTU DETAIL PETA MELAYANG SAAT MARKER DIKLIK */}
+                       {selectedMapMerchant && (
+                          <div className="absolute bottom-4 left-4 right-16 sm:left-auto sm:right-20 sm:w-80 bg-white p-4 rounded-2xl shadow-2xl border border-slate-200 z-[2000] animate-in slide-in-from-bottom-4">
+                             <button onClick={() => setSelectedMapMerchant(null)} className="absolute top-3 right-3 p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full z-10"><X className="w-4 h-4 text-slate-600"/></button>
+                             
+                             {selectedMapMerchant.fotoLapak && (
+                                <div className="h-32 w-full rounded-xl overflow-hidden mb-3 bg-slate-100">
+                                   <img src={selectedMapMerchant.fotoLapak} className="w-full h-full object-cover" alt="Foto Lapak" />
+                                </div>
+                             )}
+                             
+                             <div className="flex gap-2 items-center mb-1.5">
+                                <span className="bg-blue-100 text-blue-800 text-[9px] font-extrabold px-2 py-0.5 rounded tracking-wide border border-blue-200">{selectedMapMerchant.kategori}</span>
+                                <span className="font-mono text-[10px] font-bold text-slate-500">{selectedMapMerchant.accountId}</span>
+                             </div>
+                             
+                             <h4 className="font-bold text-slate-800 leading-tight mb-1 text-base">{selectedMapMerchant.nama}</h4>
+                             <p className="text-xs text-slate-500 flex items-start gap-1"><MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-500"/> <span className="line-clamp-2">{selectedMapMerchant.keterangan}</span></p>
+                             
+                             <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center bg-slate-50 rounded-lg p-2">
+                                {selectedMapMerchant.totalTunggakan > 0 ? (
+                                   <div>
+                                      <p className="text-[10px] text-red-500 font-bold uppercase tracking-wide">Tunggakan Terdata</p>
+                                      <p className="text-sm font-black text-red-600">{formatRp(selectedMapMerchant.totalTunggakan)}</p>
+                                   </div>
+                                ) : (
+                                   <div className="flex items-center gap-1.5 text-emerald-700">
+                                      <CheckCircle className="w-5 h-5"/>
+                                      <div>
+                                         <p className="text-xs font-bold">Lunas / Aman</p>
+                                         <p className="text-[9px] font-medium opacity-80">Tidak ada tunggakan</p>
+                                      </div>
+                                   </div>
+                                )}
+                                <button onClick={() => { flyToMerchantOnMap(selectedMapMerchant); }} className="p-2.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 shadow-sm" title="Pusatkan Peta"><Crosshair className="w-4 h-4"/></button>
+                             </div>
+                          </div>
+                       )}
 
                        <div id="ragunan-map" className="w-full h-full z-0"></div>
                        
@@ -1377,10 +1158,10 @@ export default function App() {
                        )}
                     </div>
 
-                    <div className="w-full h-[60vh] lg:h-auto lg:w-[380px] bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden shrink-0 z-10">
+                    <div className="w-full h-[60vh] lg:h-auto lg:w-[380px] bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden shrink-0 z-10 relative">
                        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 shrink-0">
                           <label className="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1.5 sm:mb-2 uppercase tracking-widest"><Filter className="w-3.5 h-3.5 inline mb-0.5"/> Filter Zonasi Peta</label>
-                          <select value={selectedZone} onChange={e => setSelectedZone(e.target.value)} className="w-full px-3 py-2 sm:py-2.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm font-bold text-slate-700 shadow-sm outline-none cursor-pointer focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                          <select value={selectedZone} onChange={e => { setSelectedZone(e.target.value); setSelectedMapMerchant(null); }} className="w-full px-3 py-2 sm:py-2.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm font-bold text-slate-700 shadow-sm outline-none cursor-pointer focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                             {mapZonesData.map((z, i) => <option key={i} value={z.id}>{z.name}</option>)}
                           </select>
                        </div>
@@ -1772,6 +1553,61 @@ export default function App() {
               </main>
             </div>
 
+            {/* MODAL HISTORI TAGIHAN (DIBUAT BARU SESUAI PERMINTAAN) */}
+            {selectedMerchant && (
+               <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl flex flex-col max-h-[85vh] animate-in zoom-in-95">
+                     <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-2xl shrink-0">
+                        <div>
+                           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><RefreshCw className="w-5 h-5 text-blue-600"/> Histori Pembayaran</h3>
+                           <p className="text-xs text-slate-500 mt-1">{selectedMerchant.nama} <span className="font-mono bg-white border border-slate-200 px-1 py-0.5 rounded ml-1">{selectedMerchant.accountId}</span></p>
+                        </div>
+                        <button onClick={() => setSelectedMerchant(null)} className="p-1.5 hover:bg-slate-200 rounded-full transition-colors"><X className="w-5 h-5 text-slate-500" /></button>
+                     </div>
+                     <div className="p-0 overflow-y-auto">
+                        {(!selectedMerchant.riwayatTagihan || selectedMerchant.riwayatTagihan.length === 0) ? (
+                           <div className="p-10 flex flex-col items-center justify-center text-center">
+                              <Database className="w-12 h-12 text-slate-300 mb-3" />
+                              <p className="text-slate-500 font-semibold">Belum ada riwayat pembayaran.</p>
+                              <p className="text-xs text-slate-400 mt-1">Data akan muncul setelah Anda melakukan Rekonsiliasi file Excel dari Bank.</p>
+                           </div>
+                        ) : (
+                           <table className="w-full text-left text-sm">
+                              <thead className="bg-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-600 sticky top-0">
+                                 <tr>
+                                    <th className="px-5 py-4 border-b border-slate-200">Periode</th>
+                                    <th className="px-5 py-4 border-b border-slate-200">Nominal</th>
+                                    <th className="px-5 py-4 border-b border-slate-200">Status</th>
+                                    <th className="px-5 py-4 border-b border-slate-200">Terakhir Update</th>
+                                 </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                 {selectedMerchant.riwayatTagihan.map((riwayat, i) => (
+                                    <tr key={i} className="hover:bg-slate-50 transition-colors">
+                                       <td className="px-5 py-3 font-bold text-slate-700">{riwayat.periode}</td>
+                                       <td className="px-5 py-3 font-mono font-bold text-slate-800">{formatRp(riwayat.nominalBayar || riwayat.nominalTagihan)}</td>
+                                       <td className="px-5 py-3">
+                                          <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold border inline-flex items-center gap-1 ${riwayat.status === 'LUNAS' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                             {riwayat.status === 'LUNAS' ? <CheckCircle className="w-3 h-3"/> : <AlertTriangle className="w-3 h-3"/>}
+                                             {riwayat.status}
+                                          </span>
+                                       </td>
+                                       <td className="px-5 py-3 text-xs text-slate-500">
+                                          {riwayat.tglUpdate}
+                                       </td>
+                                    </tr>
+                                 ))}
+                              </tbody>
+                           </table>
+                        )}
+                     </div>
+                     <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end shrink-0 rounded-b-2xl">
+                        <button onClick={() => setSelectedMerchant(null)} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-bold transition-colors shadow-sm">Tutup Histori</button>
+                     </div>
+                  </div>
+               </div>
+            )}
+
             {/* MODAL EDIT DATA (TERBUKA UNTUK ADMIN DAN PETUGAS) */}
             {editModal.isOpen && editModal.data && (
               <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1904,8 +1740,8 @@ export default function App() {
                 </div>
               </div>
             )}
-
-            {/* MODAL LAINNYA TETAP SEPERTI SEMULA */}
+            
+            {/* Modal kalender & kelola tambah dibiarkan disembunyikan demi efisiensi render (opsional jika dibutuhkan tetap ada di state di atas) */}
           </div>
         );
       })()}
