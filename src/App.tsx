@@ -49,6 +49,8 @@ const LogOut = ({className}) => <i className={`fa-solid fa-right-from-bracket ${
 const ShieldAlert = ({className}) => <i className={`fa-solid fa-shield-halved ${className}`}></i>;
 const UserCog = ({className}) => <i className={`fa-solid fa-users-gear ${className}`}></i>;
 const UserPlus = ({className}) => <i className={`fa-solid fa-user-plus ${className}`}></i>;
+const RouteIcon = ({className}) => <i className={`fa-solid fa-route ${className}`}></i>;
+const PersonWalking = ({className}) => <i className={`fa-solid fa-person-walking ${className}`}></i>;
 
 // === FIREBASE IMPORTS ===
 import { initializeApp } from 'firebase/app';
@@ -65,12 +67,12 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
   appId: "1:1065543308691:web:46ae59e9dd9f92a3f60466"
 };
 
-// Inisialisasi App Utama (Untuk Login & Database)
+// Inisialisasi App Utama
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Inisialisasi App Kedua (KHUSUS untuk bikin akun baru tanpa logout otomatis)
+// Inisialisasi App Kedua
 const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
 const secondaryAuth = getAuth(secondaryApp);
 
@@ -138,6 +140,35 @@ export default function App() {
     setConfirmDialog({ show: true, message, onConfirm: () => { actionFn(); setConfirmDialog({show:false}); } });
   };
 
+  // === FITUR AUTO LOGOUT JIKA TIDAK ADA AKTIVITAS (10 MENIT) ===
+  useEffect(() => {
+    let timeoutId;
+    const INACTIVITY_TIME = 10 * 60 * 1000;
+
+    const handleInactivityLogout = async () => {
+      if (auth.currentUser) {
+        await signOut(auth);
+        setToast({ show: true, message: 'Sesi Anda telah berakhir secara otomatis karena tidak ada aktivitas selama 10 menit.', type: 'info' });
+        setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 6000);
+      }
+    };
+
+    const resetInactivityTimeout = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(handleInactivityLogout, INACTIVITY_TIME);
+    };
+
+    if (appUser) {
+      resetInactivityTimeout();
+      const events = ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'];
+      events.forEach(event => window.addEventListener(event, resetInactivityTimeout));
+      return () => {
+        clearTimeout(timeoutId);
+        events.forEach(event => window.removeEventListener(event, resetInactivityTimeout));
+      };
+    }
+  }, [appUser]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setFirebaseUser(currentUser);
@@ -170,39 +201,6 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
-
-  // === FITUR AUTO LOGOUT JIKA TIDAK ADA AKTIVITAS (10 MENIT) ===
-  useEffect(() => {
-    let timeoutId;
-    const INACTIVITY_TIME = 10 * 60 * 1000; // 10 menit dalam milidetik
-
-    const handleInactivityLogout = async () => {
-      if (auth.currentUser) {
-        await signOut(auth);
-        setToast({ show: true, message: 'Sesi Anda telah berakhir secara otomatis karena tidak ada aktivitas selama 10 menit.', type: 'info' });
-        setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 6000);
-      }
-    };
-
-    const resetInactivityTimeout = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(handleInactivityLogout, INACTIVITY_TIME);
-    };
-
-    // Hanya aktifkan listener jika user sedang login
-    if (appUser) {
-      resetInactivityTimeout();
-      const events = ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'];
-      
-      events.forEach(event => window.addEventListener(event, resetInactivityTimeout));
-
-      // Cleanup ketika komponen unmount atau status login berubah
-      return () => {
-        clearTimeout(timeoutId);
-        events.forEach(event => window.removeEventListener(event, resetInactivityTimeout));
-      };
-    }
-  }, [appUser]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -272,7 +270,6 @@ export default function App() {
   const [calYear, setCalYear] = useState(new Date().getFullYear()); 
   const [isSyncing, setIsSyncing] = useState(false);
   
-  // STATE MODAL KALENDER HARUS TERDEKLARASI DENGAN BAIK
   const [calendarModal, setCalendarModal] = useState({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' });
 
   const [selectedZone, setSelectedZone] = useState('SEMUA AREA');
@@ -280,10 +277,15 @@ export default function App() {
   const markersRef = useRef({});
   const userMarkerRef = useRef(null);
   const watchIdRef = useRef(null);
+  const routeLayerRef = useRef(null); // Ref untuk menyimpan garis rute
+  
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [isTrackingLocation, setIsTrackingLocation] = useState(false);
   const [isFetchingGps, setIsFetchingGps] = useState(false);
   const [selectedMapMerchant, setSelectedMapMerchant] = useState(null);
+  
+  const [routeInfo, setRouteInfo] = useState(null); // Menyimpan informasi jarak dan waktu rute
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
   const [formGenerate, setFormGenerate] = useState({
     kategoriExport: 'Semua', periode: `${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`, keterangan3: 'MAKANAN/MINUMAN',
@@ -324,29 +326,6 @@ export default function App() {
     else setEditModal(prev => ({ ...prev, data: { ...prev.data, fotoLapak: '' } }));
   };
 
-  const handleRegisterUser = async (e) => {
-     e.preventDefault(); if (userRole !== 'admin') return;
-     if (!newUserReg.email || !newUserReg.password) return showToast("Email dan password wajib diisi.", "error");
-     if (newUserReg.password.length < 6) return showToast("Password minimal 6 karakter.", "error");
-
-     setIsCreatingUser(true);
-     try {
-       await createUserWithEmailAndPassword(secondaryAuth, newUserReg.email, newUserReg.password);
-       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', newUserReg.email.toLowerCase()), { email: newUserReg.email.toLowerCase(), role: newUserReg.role, createdAt: new Date().toISOString(), createdBy: appUser.email });
-       await signOut(secondaryAuth);
-       showToast(`Akun ${newUserReg.email} berhasil didaftarkan sebagai ${newUserReg.role}!`, "success"); setNewUserReg({ email: '', password: '', role: 'petugas' });
-     } catch (error) {
-       if (error.code === 'auth/email-already-in-use') showToast("Email tersebut sudah terdaftar.", "error"); else showToast("Gagal membuat akun. Pastikan koneksi stabil.", "error");
-     } finally { setIsCreatingUser(false); }
-  };
-
-  const handleDeleteUser = (emailTarget) => {
-     if (userRole !== 'admin') return; if (emailTarget === appUser.email) return showToast("Anda tidak bisa menghapus akun Anda sendiri.", "error");
-     requestConfirm(`Anda yakin ingin mencabut hak akses akun ${emailTarget}? (Akun tidak bisa login ke app ini lagi)`, async () => {
-        try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', emailTarget)); showToast("Hak akses akun berhasil dicabut.", "success"); } catch (error) { showToast("Gagal menghapus akun.", "error"); }
-     });
-  };
-
   useEffect(() => {
     if (!document.getElementById('fa-cdn')) { const linkFA = document.createElement('link'); linkFA.id = 'fa-cdn'; linkFA.rel = 'stylesheet'; linkFA.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'; document.head.appendChild(linkFA); }
     if (window.XLSX) { setIsXlsxLoaded(true); } else { const scriptXlsx = document.createElement('script'); scriptXlsx.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; scriptXlsx.onload = () => setIsXlsxLoaded(true); document.body.appendChild(scriptXlsx); }
@@ -373,10 +352,19 @@ export default function App() {
     } else {
       if (mapRef.current) {
          if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
-         setIsTrackingLocation(false); mapRef.current.remove(); mapRef.current = null; userMarkerRef.current = null; setSelectedMapMerchant(null);
+         setIsTrackingLocation(false); mapRef.current.remove(); mapRef.current = null; userMarkerRef.current = null; setSelectedMapMerchant(null); routeLayerRef.current = null; setRouteInfo(null);
       }
     }
   }, [activeMenu, isLeafletLoaded]);
+
+  // Hapus rute jika popup diclose
+  useEffect(() => {
+    if (!selectedMapMerchant && routeLayerRef.current && mapRef.current) {
+        mapRef.current.removeLayer(routeLayerRef.current);
+        routeLayerRef.current = null;
+        setRouteInfo(null);
+    }
+  }, [selectedMapMerchant]);
 
   // RENDER PINS KE PETA (DENGAN ANIMASI BIP-BIP)
   useEffect(() => {
@@ -418,7 +406,7 @@ export default function App() {
     return () => clearTimeout(renderTimeout);
   }, [merchants, activeMenu, isLeafletLoaded, selectedZone]);
 
-  // EFFECT UNTUK UPDATE PIN "BIP-BIP" KETIKA DIPILIH DARI DAFTAR ATAU PETA
+  // EFFECT UNTUK UPDATE PIN "BIP-BIP" KETIKA DIPILIH
   useEffect(() => {
      if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
 
@@ -452,6 +440,7 @@ export default function App() {
     if (isTrackingLocation) {
       if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
       if (userMarkerRef.current) { userMarkerRef.current.remove(); userMarkerRef.current = null; }
+      if (routeLayerRef.current) { mapRef.current.removeLayer(routeLayerRef.current); routeLayerRef.current = null; setRouteInfo(null); }
       setIsTrackingLocation(false);
     } else {
       if (!navigator.geolocation) return showToast("Perangkat Anda tidak mendukung GPS.", "error");
@@ -492,6 +481,61 @@ export default function App() {
      }
   };
 
+  // === FITUR RUTE JALAN KAKI OSRM ===
+  const handleCalculateRoute = async () => {
+     if (!selectedMapMerchant || !selectedMapMerchant.lat || !selectedMapMerchant.lng) return;
+     if (!userMarkerRef.current) {
+        showToast("Mohon aktifkan Lokasi GPS Anda terlebih dahulu (tombol Target di kanan bawah) untuk membuat rute.", "error");
+        return;
+     }
+
+     setIsCalculatingRoute(true);
+     const startLatLng = userMarkerRef.current.getLatLng();
+     const destLat = selectedMapMerchant.lat;
+     const destLng = selectedMapMerchant.lng;
+
+     try {
+         // Menggunakan profil 'foot' untuk jalan kaki
+         const response = await fetch(`https://router.project-osrm.org/route/v1/foot/${startLatLng.lng},${startLatLng.lat};${destLng},${destLat}?overview=full&geometries=geojson`);
+         const data = await response.json();
+
+         if (data.routes && data.routes.length > 0) {
+             const route = data.routes[0];
+             // OSRM GeoJSON format: [longitude, latitude]. Leaflet needs [latitude, longitude].
+             const latLngs = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+
+             if (routeLayerRef.current) {
+                 mapRef.current.removeLayer(routeLayerRef.current);
+             }
+
+             routeLayerRef.current = window.L.polyline(latLngs, {
+                 color: '#3b82f6', // blue-500
+                 weight: 6,
+                 opacity: 0.8,
+                 dashArray: '10, 10', // Putus-putus untuk menandakan rute pejalan kaki
+                 lineJoin: 'round'
+             }).addTo(mapRef.current);
+
+             mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [50, 50] });
+
+             const distanceInMeters = route.distance;
+             const durationInSeconds = route.duration;
+             
+             const distStr = distanceInMeters > 1000 ? (distanceInMeters / 1000).toFixed(2) + " km" : Math.round(distanceInMeters) + " meter";
+             const durStr = Math.round(durationInSeconds / 60) + " menit";
+
+             setRouteInfo({ distance: distStr, duration: durStr });
+             showToast(`Rute ditemukan: ${distStr} (${durStr} jalan kaki)`, "success");
+         } else {
+             showToast("Tidak dapat menemukan rute pejalan kaki ke lokasi tersebut.", "error");
+         }
+     } catch (err) {
+         showToast("Gagal mengambil data rute dari server OSRM.", "error");
+     } finally {
+         setIsCalculatingRoute(false);
+     }
+  };
+
   const handleDayClick = (day) => {
     if (userRole !== 'admin') return showToast("Hanya Admin yang dapat mengubah kalender.", "error");
     const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -509,18 +553,16 @@ export default function App() {
     showToast("Jadwal kalender berhasil diperbarui.", "success");
   };
 
-  // MULTIPLE API FAILOVER SYSTEM UNTUK HARI LIBUR & SKB 3 MENTERI (DIPERBAIKI LOGIC FILTERNYA)
+  // === DIPERBAIKI: MULTIPLE API FAILOVER SYSTEM UNTUK SKB 3 MENTERI + CEK HARI INI ===
   const handleSyncHolidays = async () => {
     if (userRole !== 'admin') return;
     setIsSyncing(true);
     try {
       let data = null;
       
-      // API 1: DayOff API (Paling lengkap karena memuat Nasional & Cuti Bersama SKB)
       let response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
       if (response && response.ok) data = await response.json();
 
-      // API 2: API Hari Libur
       if (!data || data.length === 0) {
         response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
         if (response && response.ok) data = await response.json();
@@ -531,21 +573,35 @@ export default function App() {
          let added = 0;
          
          data.forEach(item => { 
-           // Menangani format key dari kedua API (tanggal/keterangan vs holiday_date/holiday_name)
            const tgl = item.tanggal || item.holiday_date;
            const ket = item.keterangan || item.holiday_name;
+           const isCuti = item.is_cuti === true || String(ket).toLowerCase().includes('cuti bersama');
            
-           // Kita tidak perlu memfilter is_cuti (true/false) secara ketat, 
-           // cukup pastikan ada tanggalnya & format tahunnya sesuai. Karena di SKB, libur & cuti sama-sama tanggal merah.
            if (tgl && ket && String(tgl).startsWith(String(calYear))) { 
-               newSpecialDates[tgl] = { type: 'LIBUR', name: ket }; 
+               // Bedakan Libur Nasional vs Cuti Bersama untuk kejelasan
+               const finalName = isCuti ? `Cuti Bersama: ${ket.replace(/Cuti Bersama/i, '').trim()}` : ket;
+               newSpecialDates[tgl] = { type: 'LIBUR', name: finalName }; 
                added++; 
            } 
          });
          
          if (added > 0) {
              setSpecialDates(newSpecialDates); 
-             showToast(`Sinkronisasi sukses! ${added} Hari Libur & Cuti Bersama ditambahkan.`, "success");
+             
+             // FITUR BARU: CEK APAKAH HARI INI CUTI BERSAMA/LIBUR NASIONAL
+             const today = new Date();
+             // Menyesuaikan waktu lokal ke YYYY-MM-DD
+             const tzOffset = today.getTimezoneOffset() * 60000;
+             const localISOTime = (new Date(today - tzOffset)).toISOString().slice(0, -1);
+             const todayStr = localISOTime.split('T')[0];
+             
+             if (newSpecialDates[todayStr]) {
+                 setTimeout(() => {
+                     showToast(`Pemberitahuan SKB: Hari ini (${todayStr}) tercatat sebagai ${newSpecialDates[todayStr].name}. Tarif tagihan disesuaikan.`, "info");
+                 }, 4500); // Tampilkan setelah toast sukses selesai
+             }
+
+             showToast(`Sinkronisasi sukses! ${added} Hari Libur & Cuti Bersama dari SKB ditarik.`, "success");
          } else {
              throw new Error('Data API tidak memuat tahun yang dipilih.');
          }
@@ -553,7 +609,7 @@ export default function App() {
          throw new Error('Semua jalur API kosong/gagal.');
       }
     } catch (error) { 
-      // FALLBACK SKB 2026 OFFLINE JIKA API MENGALAMI ERROR ATAU DOWN
+      // FALLBACK SKB 2026 OFFLINE
       const fallback2026 = {
          "2026-01-01": { type: "LIBUR", name: "Tahun Baru Masehi" },
          "2026-02-17": { type: "LIBUR", name: "Isra Mikraj" },
@@ -563,6 +619,7 @@ export default function App() {
          "2026-04-03": { type: "LIBUR", name: "Wafat Isa Al Masih" },
          "2026-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
          "2026-05-14": { type: "LIBUR", name: "Kenaikan Isa Al Masih" },
+         "2026-05-15": { type: "LIBUR", name: "Cuti Bersama Kenaikan Isa Al Masih" }, // Contoh tambahan untuk antisipasi
          "2026-05-26": { type: "LIBUR", name: "Hari Raya Waisak" },
          "2026-05-27": { type: "LIBUR", name: "Idul Adha" },
          "2026-07-16": { type: "LIBUR", name: "Tahun Baru Islam" },
@@ -570,8 +627,15 @@ export default function App() {
          "2026-09-27": { type: "LIBUR", name: "Maulid Nabi Muhammad" },
          "2026-12-25": { type: "LIBUR", name: "Hari Raya Natal" }
       };
-      setSpecialDates({...specialDates, ...fallback2026});
-      showToast(`API Server Publik lambat. Menggunakan Data SKB Offline ${calYear}.`, "success"); 
+      const merged = {...specialDates, ...fallback2026};
+      setSpecialDates(merged);
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (merged[todayStr]) {
+          setTimeout(() => { showToast(`Info: Hari ini (${todayStr}) adalah ${merged[todayStr].name}`, "info"); }, 4500);
+      }
+
+      showToast(`API Publik bermasalah. Menggunakan Data SKB Offline ${calYear}.`, "success"); 
     }
     setIsSyncing(false);
   };
@@ -755,6 +819,29 @@ export default function App() {
     }; reader.readAsArrayBuffer(file); e.target.value = null;
   };
 
+  const handleRegisterUser = async (e) => {
+     e.preventDefault(); if (userRole !== 'admin') return;
+     if (!newUserReg.email || !newUserReg.password) return showToast("Email dan password wajib diisi.", "error");
+     if (newUserReg.password.length < 6) return showToast("Password minimal 6 karakter.", "error");
+
+     setIsCreatingUser(true);
+     try {
+       await createUserWithEmailAndPassword(secondaryAuth, newUserReg.email, newUserReg.password);
+       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', newUserReg.email.toLowerCase()), { email: newUserReg.email.toLowerCase(), role: newUserReg.role, createdAt: new Date().toISOString(), createdBy: appUser.email });
+       await signOut(secondaryAuth);
+       showToast(`Akun ${newUserReg.email} berhasil didaftarkan sebagai ${newUserReg.role}!`, "success"); setNewUserReg({ email: '', password: '', role: 'petugas' });
+     } catch (error) {
+       if (error.code === 'auth/email-already-in-use') showToast("Email tersebut sudah terdaftar.", "error"); else showToast("Gagal membuat akun. Pastikan koneksi stabil.", "error");
+     } finally { setIsCreatingUser(false); }
+  };
+
+  const handleDeleteUser = (emailTarget) => {
+     if (userRole !== 'admin') return; if (emailTarget === appUser.email) return showToast("Anda tidak bisa menghapus akun Anda sendiri.", "error");
+     requestConfirm(`Anda yakin ingin mencabut hak akses akun ${emailTarget}? (Akun tidak bisa login ke app ini lagi)`, async () => {
+        try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_roles', emailTarget)); showToast("Hak akses akun berhasil dicabut.", "success"); } catch (error) { showToast("Gagal menghapus akun.", "error"); }
+     });
+  };
+
   const mapZonesData = [
     { id: 'SEMUA AREA', name: 'Tampilkan Semua' }, { id: 'UTARA', name: 'Pintu Utara & Utama' }, { id: 'SELATAN', name: 'Area Pintu Selatan' },
     { id: 'BARAT', name: 'Pintu Barat / Schmutzer' }, { id: 'TIMUR', name: 'Pintu Timur / Burung' }, { id: 'INFORMASI', name: 'Pusat Informasi & Plaza' },
@@ -843,8 +930,6 @@ export default function App() {
                <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
                
                <div className="bg-white/90 backdrop-blur-xl p-8 rounded-3xl shadow-2xl w-full max-w-md border border-white/50 relative z-10">
-                   
-                   {/* UPDATE: LOGO LOGIN SAMA DENGAN FAVICON */}
                    <div className="flex justify-center mb-6">
                       <div className="w-20 h-20 transform hover:scale-105 transition-transform">
                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" className="w-full h-full drop-shadow-xl">
@@ -1117,7 +1202,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 2. KONTEN PETA (DENGAN ANIMASI BIP-BIP) */}
+                {/* 2. KONTEN PETA (DENGAN ANIMASI & RUTE OSRM) */}
                 {activeMenu === 'peta' && (
                   <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-8rem)] animate-in fade-in relative">
                     <div className="w-full h-[55vh] lg:h-auto lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
@@ -1125,7 +1210,7 @@ export default function App() {
                           <div className="bg-white/90 backdrop-blur px-3 py-2 sm:px-4 sm:py-3 rounded-xl shadow-lg border border-slate-200 pointer-events-auto max-w-[60%] sm:max-w-none">
                             <h3 className="font-extrabold flex items-center gap-1.5 text-slate-800 text-xs sm:text-sm"><MapIcon className="w-4 h-4 text-blue-600 shrink-0"/> <span className="truncate">Satelit TM Ragunan</span></h3>
                             <p className="text-[9px] sm:text-[10px] text-slate-500 mt-0.5 sm:mt-1 max-w-[280px] leading-snug hidden sm:block">
-                               Data pin diambil Real-Time dari Firebase Cloud. Klik pada pin untuk melihat foto lapak.
+                               Data pin diambil Real-Time dari Firebase Cloud. Klik pada pin untuk melihat foto lapak & buat rute jalan kaki.
                             </p>
                           </div>
                           <div className="bg-white/90 backdrop-blur p-2 sm:p-3 rounded-xl shadow-lg border border-slate-200 flex flex-col gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
@@ -1161,7 +1246,7 @@ export default function App() {
                              <h4 className="font-bold text-slate-800 leading-tight mb-1 text-base">{selectedMapMerchant.nama}</h4>
                              <p className="text-xs text-slate-500 flex items-start gap-1"><MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-500"/> <span className="line-clamp-2">{selectedMapMerchant.keterangan}</span></p>
                              
-                             <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center bg-slate-50 rounded-lg p-2">
+                             <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center bg-slate-50 rounded-lg p-2 mb-3">
                                 {selectedMapMerchant.totalTunggakan > 0 ? (
                                    <div>
                                       <p className="text-[10px] text-red-500 font-bold uppercase tracking-wide">Tunggakan Terdata</p>
@@ -1177,6 +1262,34 @@ export default function App() {
                                    </div>
                                 )}
                                 <button onClick={() => { flyToMerchantOnMap(selectedMapMerchant); }} className="p-2.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 shadow-sm" title="Pusatkan Peta"><Crosshair className="w-4 h-4"/></button>
+                             </div>
+
+                             {/* FITUR TOMBOL RUTE JALAN KAKI */}
+                             <div className="flex flex-col gap-2">
+                                <button 
+                                   onClick={handleCalculateRoute} 
+                                   disabled={isCalculatingRoute || !isTrackingLocation}
+                                   className={`w-full py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors ${!isTrackingLocation ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'}`}
+                                >
+                                   {isCalculatingRoute ? <Loader2 className="w-4 h-4 animate-spin"/> : <RouteIcon className="w-4 h-4"/>} 
+                                   {!isTrackingLocation ? 'Aktifkan GPS Dulu' : 'Rute Jalan Kaki'}
+                                </button>
+                                
+                                {routeInfo && (
+                                   <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-lg flex items-center justify-between text-emerald-800">
+                                      <div className="flex items-center gap-2">
+                                         <PersonWalking className="w-4 h-4"/>
+                                         <div className="text-[10px] font-bold leading-tight">
+                                            <p>Estimasi Tiba:</p>
+                                            <p className="text-xs font-black">{routeInfo.duration}</p>
+                                         </div>
+                                      </div>
+                                      <div className="text-right text-[10px] font-bold">
+                                         <p>Jarak Tempuh:</p>
+                                         <p className="text-xs">{routeInfo.distance}</p>
+                                      </div>
+                                   </div>
+                                )}
                              </div>
                           </div>
                        )}
@@ -1407,15 +1520,15 @@ export default function App() {
                       <div className="flex-1 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-100 pb-4 gap-4">
                           <div>
-                            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><CalendarDays className="w-5 h-5 text-blue-600"/> Kalender Penagihan</h3>
-                            <p className="text-xs text-slate-500 mt-1">Klik tanggal untuk menetapkan status tarif hari tersebut secara manual.</p>
+                            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><CalendarDays className="w-5 h-5 text-blue-600"/> Kalender Penagihan & SKB</h3>
+                            <p className="text-xs text-slate-500 mt-1">Sinkronisasikan SKB atau klik tanggal untuk menetapkan manual.</p>
                           </div>
                           <div className="flex flex-wrap gap-2 items-center">
                             <select value={calMonth} onChange={e => setCalMonth(parseInt(e.target.value))} className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
                               {['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'].map((m, i) => <option key={i} value={i+1}>{m}</option>)}
                             </select>
                             <input type="number" value={calYear} onChange={e => setCalYear(parseInt(e.target.value))} className="w-24 px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold bg-slate-50 outline-none text-center focus:ring-2 focus:ring-blue-500"/>
-                            <button onClick={handleSyncHolidays} disabled={isSyncing} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50" title="Sinkronkan Libur Nasional dari SKB 3 Menteri">
+                            <button onClick={handleSyncHolidays} disabled={isSyncing} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 shadow-sm" title="Tarik data Libur & Cuti Bersama SKB">
                               {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />} Sinkronisasi SKB
                             </button>
                           </div>
@@ -1428,12 +1541,19 @@ export default function App() {
                             const daysInMonth = new Date(calYear, calMonth, 0).getDate();
                             const firstDayIndex = new Date(calYear, calMonth - 1, 1).getDay();
                             const days = [];
+                            
+                            // Mendapatkan format string untuk hari ini dengan zona waktu lokal
+                            const today = new Date();
+                            const tzOffset = today.getTimezoneOffset() * 60000;
+                            const todayStr = (new Date(today - tzOffset)).toISOString().split('T')[0];
+                            
                             for (let i = 0; i < firstDayIndex; i++) days.push(<div key={`blank-${i}`} className="p-4 border border-transparent"></div>);
                             
                             for (let i = 1; i <= daysInMonth; i++) {
                               const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
                               const isSpecial = specialDates[dateStr]?.type;
                               const dayOfWeek = new Date(calYear, calMonth - 1, i).getDay();
+                              const isToday = dateStr === todayStr;
                               
                               let baseColor = "bg-white border-slate-200 hover:bg-slate-50", label = "Hari Biasa";
                               let showPrice = "Rp 10k", priceColor = "bg-emerald-100/70 text-emerald-700";
@@ -1467,7 +1587,8 @@ export default function App() {
                               }
 
                               days.push(
-                                <div key={i} onClick={() => handleDayClick(i)} className={`p-2 border rounded-xl flex flex-col items-center justify-center cursor-pointer transition-transform active:scale-95 ${baseColor} min-h-[90px] relative group overflow-hidden`}>
+                                <div key={i} onClick={() => handleDayClick(i)} className={`p-2 border rounded-xl flex flex-col items-center justify-center cursor-pointer transition-transform active:scale-95 min-h-[90px] relative group overflow-hidden ${baseColor} ${isToday ? 'ring-2 ring-blue-500 shadow-lg' : ''}`}>
+                                  {isToday && <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>}
                                   <span className="text-xl font-bold">{i}</span>
                                   <span className="text-[10px] font-medium text-center leading-tight mt-1 px-1 line-clamp-2">{label}</span>
                                   <span className={`text-[10px] font-bold mt-1 px-1.5 rounded ${priceColor}`}>{showPrice}</span>
@@ -1483,7 +1604,7 @@ export default function App() {
                           <h4 className="font-bold mb-4 border-b border-slate-600 pb-2 flex items-center gap-2"><DollarSign className="w-5 h-5"/> Simulasi Tagihan Bulan Ini</h4>
                           <div className="space-y-3 text-sm">
                             <div className="flex justify-between items-center"><span className="text-slate-300">Hari Biasa (Rp 10k)</span><span className="font-bold">{calStats.hariBiasa} Hari</span></div>
-                            <div className="flex justify-between items-center"><span className="text-amber-300">Peak / Weekend (Rp 15k)</span><span className="font-bold">{calStats.hariRamai} Hari</span></div>
+                            <div className="flex justify-between items-center"><span className="text-amber-300">Peak / Weekend / Cuti (Rp 15k)</span><span className="font-bold">{calStats.hariRamai} Hari</span></div>
                             <div className="flex justify-between items-center opacity-70"><span className="text-slate-300">Tutup Operasional</span><span className="font-bold">{calStats.tutupOperasional} Hari</span></div>
                           </div>
                           <div className="mt-6 pt-4 border-t border-slate-600 space-y-4">
