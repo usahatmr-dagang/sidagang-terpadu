@@ -171,6 +171,39 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // === FITUR AUTO LOGOUT JIKA TIDAK ADA AKTIVITAS (10 MENIT) ===
+  useEffect(() => {
+    let timeoutId;
+    const INACTIVITY_TIME = 10 * 60 * 1000; // 10 menit dalam milidetik
+
+    const handleInactivityLogout = async () => {
+      if (auth.currentUser) {
+        await signOut(auth);
+        setToast({ show: true, message: 'Sesi Anda telah berakhir secara otomatis karena tidak ada aktivitas selama 10 menit.', type: 'info' });
+        setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 6000);
+      }
+    };
+
+    const resetInactivityTimeout = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(handleInactivityLogout, INACTIVITY_TIME);
+    };
+
+    // Hanya aktifkan listener jika user sedang login
+    if (appUser) {
+      resetInactivityTimeout();
+      const events = ['mousemove', 'keydown', 'scroll', 'click', 'touchstart'];
+      
+      events.forEach(event => window.addEventListener(event, resetInactivityTimeout));
+
+      // Cleanup ketika komponen unmount atau status login berubah
+      return () => {
+        clearTimeout(timeoutId);
+        events.forEach(event => window.removeEventListener(event, resetInactivityTimeout));
+      };
+    }
+  }, [appUser]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) return showToast("Email dan Password wajib diisi.", "error");
@@ -483,19 +516,13 @@ export default function App() {
     try {
       let data = null;
       
-      // API 1: API Hari Libur
-      let response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
+      // API 1: DayOff API (Paling lengkap karena memuat Nasional & Cuti Bersama SKB)
+      let response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
       if (response && response.ok) data = await response.json();
 
-      // API 2: DayOff API
+      // API 2: API Hari Libur
       if (!data || data.length === 0) {
-        response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
-        if (response && response.ok) data = await response.json();
-      }
-      
-      // API 3: AllOrigins Proxy (Jika terblokir CORS)
-      if (!data || data.length === 0) {
-        response = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://dayoffapi.vercel.app/api?year='+calYear)}`).catch(() => null);
+        response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
         if (response && response.ok) data = await response.json();
       }
 
@@ -504,12 +531,12 @@ export default function App() {
          let added = 0;
          
          data.forEach(item => { 
-           // Menangani berbagai format key dari API yang berbeda
+           // Menangani format key dari kedua API (tanggal/keterangan vs holiday_date/holiday_name)
            const tgl = item.tanggal || item.holiday_date;
            const ket = item.keterangan || item.holiday_name;
            
-           // PERBAIKAN UTAMA: Semua array yang dikembalikan dari API SKB ini pada dasarnya adalah 
-           // tanggal merah (baik Cuti Bersama maupun Libur Nasional). Tidak perlu difilter secara ketat lagi.
+           // Kita tidak perlu memfilter is_cuti (true/false) secara ketat, 
+           // cukup pastikan ada tanggalnya & format tahunnya sesuai. Karena di SKB, libur & cuti sama-sama tanggal merah.
            if (tgl && ket && String(tgl).startsWith(String(calYear))) { 
                newSpecialDates[tgl] = { type: 'LIBUR', name: ket }; 
                added++; 
@@ -518,7 +545,7 @@ export default function App() {
          
          if (added > 0) {
              setSpecialDates(newSpecialDates); 
-             showToast(`Sinkronisasi sukses! ${added} Hari Libur/Cuti Bersama ditambahkan dari Cloud SKB.`, "success");
+             showToast(`Sinkronisasi sukses! ${added} Hari Libur & Cuti Bersama ditambahkan.`, "success");
          } else {
              throw new Error('Data API tidak memuat tahun yang dipilih.');
          }
@@ -816,9 +843,21 @@ export default function App() {
                <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
                
                <div className="bg-white/90 backdrop-blur-xl p-8 rounded-3xl shadow-2xl w-full max-w-md border border-white/50 relative z-10">
+                   
+                   {/* UPDATE: LOGO LOGIN SAMA DENGAN FAVICON */}
                    <div className="flex justify-center mb-6">
-                      <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 hover:rotate-6 transition-transform">
-                         <Database className="w-8 h-8 text-white transform -rotate-3" />
+                      <div className="w-20 h-20 transform hover:scale-105 transition-transform">
+                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" className="w-full h-full drop-shadow-xl">
+                           <rect x="8" y="28" width="48" height="22" fill="#0f172a" rx="4"/>
+                           <rect x="12" y="10" width="40" height="18" fill="#3b82f6" rx="2"/>
+                           <circle cx="20" cy="56" r="6" fill="#334155"/>
+                           <circle cx="44" cy="56" r="6" fill="#334155"/>
+                           <circle cx="20" cy="56" r="2" fill="#cbd5e1"/>
+                           <circle cx="44" cy="56" r="2" fill="#cbd5e1"/>
+                           <text x="32" y="44" fontFamily="Arial, sans-serif" fontSize="14" fontWeight="900" fill="#f8fafc" textAnchor="middle">TMR</text>
+                           <path d="M 6 28 L 12 10" stroke="#0f172a" strokeWidth="3" strokeLinecap="round"/>
+                           <path d="M 58 28 L 52 10" stroke="#0f172a" strokeWidth="3" strokeLinecap="round"/>
+                         </svg>
                       </div>
                    </div>
                    
