@@ -1,6 +1,12 @@
 // @ts-nocheck
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 
+// =========================================================================
+// 🔑 MASUKKAN GOOGLE MAPS API KEY ANDA DI SINI
+// =========================================================================
+const GOOGLE_MAPS_API_KEY = ""; // Contoh: "AIzaSyB-xxxxxx..."
+// =========================================================================
+
 // === ZERO-INSTALL ICONS (MOCK LUCIDE WITH FONTAWESOME) ===
 const Upload = ({className}) => <i className={`fa-solid fa-upload ${className}`}></i>;
 const FileSpreadsheet = ({className}) => <i className={`fa-solid fa-file-excel ${className}`}></i>;
@@ -286,7 +292,7 @@ export default function App() {
   const [isTrackingLocation, setIsTrackingLocation] = useState(false);
   const [isFetchingGps, setIsFetchingGps] = useState(false);
   const [selectedMapMerchant, setSelectedMapMerchant] = useState(null);
-  const [isMapPopupMinimized, setIsMapPopupMinimized] = useState(false); // State untuk fitur minimize popup peta
+  const [isMapPopupMinimized, setIsMapPopupMinimized] = useState(false);
   
   const [routeInfo, setRouteInfo] = useState(null); 
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
@@ -334,6 +340,15 @@ export default function App() {
     if (!document.getElementById('fa-cdn')) { const linkFA = document.createElement('link'); linkFA.id = 'fa-cdn'; linkFA.rel = 'stylesheet'; linkFA.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'; document.head.appendChild(linkFA); }
     if (window.XLSX) { setIsXlsxLoaded(true); } else { const scriptXlsx = document.createElement('script'); scriptXlsx.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; scriptXlsx.onload = () => setIsXlsxLoaded(true); document.body.appendChild(scriptXlsx); }
     if (window.L) { setIsLeafletLoaded(true); } else { const linkLeaflet = document.createElement('link'); linkLeaflet.rel = 'stylesheet'; linkLeaflet.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(linkLeaflet); const scriptLeaflet = document.createElement('script'); scriptLeaflet.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'; scriptLeaflet.onload = () => setIsLeafletLoaded(true); document.body.appendChild(scriptLeaflet); }
+    
+    // LOAD GOOGLE MAPS SDK (Hanya jika API Key tersedia)
+    if (GOOGLE_MAPS_API_KEY && !document.getElementById('gmaps-sdk')) {
+        const scriptGoogle = document.createElement('script');
+        scriptGoogle.id = 'gmaps-sdk';
+        scriptGoogle.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry`;
+        scriptGoogle.async = true;
+        document.body.appendChild(scriptGoogle);
+    }
   }, []);
 
   // INIT LEAFLET MAP
@@ -371,7 +386,6 @@ export default function App() {
         setRouteInfo(null);
         setIsMapPopupMinimized(false);
     } else {
-        // Reset minimize saat pilih pedagang baru
         setIsMapPopupMinimized(false);
     }
   }, [selectedMapMerchant]);
@@ -492,7 +506,7 @@ export default function App() {
      }
   };
 
-  // === FITUR RUTE JALAN KAKI OSRM & GOOGLE MAPS ===
+  // === FITUR HYBRID ROUTING (GOOGLE MAPS SDK + LEAFLET UI) ===
   const handleCalculateRoute = async () => {
      if (!selectedMapMerchant || !selectedMapMerchant.lat || !selectedMapMerchant.lng) return;
      if (!userMarkerRef.current) {
@@ -505,6 +519,63 @@ export default function App() {
      const destLat = selectedMapMerchant.lat;
      const destLng = selectedMapMerchant.lng;
 
+     // 1. CEK JIKA API KEY GOOGLE MAPS TERSEDIA DAN SCRIPT SUDAH TERLOAD
+     if (GOOGLE_MAPS_API_KEY && window.google && window.google.maps) {
+         try {
+             const directionsService = new window.google.maps.DirectionsService();
+             
+             // Minta rute resmi dari Google Maps API
+             directionsService.route({
+                 origin: { lat: startLatLng.lat, lng: startLatLng.lng },
+                 destination: { lat: destLat, lng: destLng },
+                 travelMode: window.google.maps.TravelMode.WALKING
+             }, (response, status) => {
+                 if (status === 'OK' && response.routes && response.routes.length > 0) {
+                     const route = response.routes[0];
+                     
+                     // Ambil koordinat garis rute dari Google, ubah formatnya ke Leaflet [lat, lng]
+                     const pathCoordinates = route.overview_path.map(p => [p.lat(), p.lng()]);
+
+                     if (routeLayerRef.current) {
+                         mapRef.current.removeLayer(routeLayerRef.current);
+                     }
+
+                     // Gambar garis rute Google Maps MENGGUNAKAN engine Leaflet di peta kita
+                     routeLayerRef.current = window.L.polyline(pathCoordinates, {
+                         color: '#3b82f6', // blue-500
+                         weight: 6,
+                         opacity: 0.8,
+                         dashArray: '10, 10', 
+                         lineJoin: 'round'
+                     }).addTo(mapRef.current);
+
+                     mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [50, 50] });
+
+                     // Ambil teks estimasi jarak dan waktu resmi dari Google Maps
+                     const distanceStr = route.legs[0].distance.text;
+                     const durationStr = route.legs[0].duration.text;
+
+                     setRouteInfo({ distance: distanceStr, duration: durationStr, source: 'Google Maps' });
+                     showToast(`Rute Akurat Google Maps berhasil dibuat.`, "success");
+                     
+                     setIsMapPopupMinimized(true);
+                 } else {
+                     showToast("Gagal memuat rute dari Google Maps. Mencoba server cadangan...", "error");
+                     fallbackToOSRM(startLatLng, destLat, destLng);
+                 }
+                 setIsCalculatingRoute(false);
+             });
+         } catch (err) {
+             fallbackToOSRM(startLatLng, destLat, destLng);
+         }
+     } else {
+         // 2. JIKA API KEY KOSONG, PAKAI SERVER GRATIS OSRM (SEBAGAI CADANGAN)
+         fallbackToOSRM(startLatLng, destLat, destLng);
+     }
+  };
+
+  // Fungsi cadangan jika API Key Google belum dimasukkan
+  const fallbackToOSRM = async (startLatLng, destLat, destLng) => {
      try {
          const response = await fetch(`https://router.project-osrm.org/route/v1/foot/${startLatLng.lng},${startLatLng.lat};${destLng},${destLat}?overview=full&geometries=geojson`);
          const data = await response.json();
@@ -513,36 +584,27 @@ export default function App() {
              const route = data.routes[0];
              const latLngs = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
-             if (routeLayerRef.current) {
-                 mapRef.current.removeLayer(routeLayerRef.current);
-             }
+             if (routeLayerRef.current) mapRef.current.removeLayer(routeLayerRef.current);
 
              routeLayerRef.current = window.L.polyline(latLngs, {
-                 color: '#3b82f6', // blue-500
-                 weight: 6,
-                 opacity: 0.8,
-                 dashArray: '10, 10', 
-                 lineJoin: 'round'
+                 color: '#3b82f6', weight: 6, opacity: 0.8, dashArray: '10, 10', lineJoin: 'round'
              }).addTo(mapRef.current);
 
              mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [50, 50] });
 
              const distanceInMeters = route.distance;
              const durationInSeconds = route.duration;
-             
              const distStr = distanceInMeters > 1000 ? (distanceInMeters / 1000).toFixed(2) + " km" : Math.round(distanceInMeters) + " m";
              const durStr = Math.round(durationInSeconds / 60) + " mnt";
 
-             setRouteInfo({ distance: distStr, duration: durStr });
-             showToast(`Rute peta berhasil dibuat.`, "success");
-             
-             // UX: Otomatis mengecilkan popup agar petugas bisa melihat map dengan jelas
+             setRouteInfo({ distance: distStr, duration: durStr, source: 'OSRM' });
+             showToast(`Rute peta berhasil dibuat (Via OSRM).`, "success");
              setIsMapPopupMinimized(true);
          } else {
-             showToast("Tidak dapat menemukan rute ke lokasi tersebut di peta internal.", "error");
+             showToast("Tidak dapat menemukan rute ke lokasi tersebut.", "error");
          }
      } catch (err) {
-         showToast("Gagal mengambil data rute dari server peta.", "error");
+         showToast("Gagal mengambil data rute dari server.", "error");
      } finally {
          setIsCalculatingRoute(false);
      }
@@ -557,8 +619,6 @@ export default function App() {
       const startLatLng = userMarkerRef.current.getLatLng();
       const destLat = selectedMapMerchant.lat;
       const destLng = selectedMapMerchant.lng;
-      
-      // Buka URL Deep Link Google Maps rute jalan kaki
       const url = `https://www.google.com/maps/dir/?api=1&origin=${startLatLng.lat},${startLatLng.lng}&destination=${destLat},${destLng}&travelmode=walking`;
       window.open(url, '_blank');
   };
@@ -1341,7 +1401,7 @@ export default function App() {
                                             <div className="flex items-center gap-2">
                                                <PersonWalking className="w-4 h-4"/>
                                                <div className="text-[10px] font-bold leading-tight">
-                                                  <p>Estimasi Tiba:</p>
+                                                  <p>Estimasi ({routeInfo.source}):</p>
                                                   <p className="text-xs font-black">{routeInfo.duration}</p>
                                                </div>
                                             </div>
