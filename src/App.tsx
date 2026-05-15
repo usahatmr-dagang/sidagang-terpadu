@@ -51,6 +51,9 @@ const UserCog = ({className}) => <i className={`fa-solid fa-users-gear ${classNa
 const UserPlus = ({className}) => <i className={`fa-solid fa-user-plus ${className}`}></i>;
 const RouteIcon = ({className}) => <i className={`fa-solid fa-route ${className}`}></i>;
 const PersonWalking = ({className}) => <i className={`fa-solid fa-person-walking ${className}`}></i>;
+const ChevronDown = ({className}) => <i className={`fa-solid fa-chevron-down ${className}`}></i>;
+const ChevronUp = ({className}) => <i className={`fa-solid fa-chevron-up ${className}`}></i>;
+const ExternalLink = ({className}) => <i className={`fa-solid fa-arrow-up-right-from-square ${className}`}></i>;
 
 // === FIREBASE IMPORTS ===
 import { initializeApp } from 'firebase/app';
@@ -277,14 +280,15 @@ export default function App() {
   const markersRef = useRef({});
   const userMarkerRef = useRef(null);
   const watchIdRef = useRef(null);
-  const routeLayerRef = useRef(null); // Ref untuk menyimpan garis rute
+  const routeLayerRef = useRef(null); 
   
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [isTrackingLocation, setIsTrackingLocation] = useState(false);
   const [isFetchingGps, setIsFetchingGps] = useState(false);
   const [selectedMapMerchant, setSelectedMapMerchant] = useState(null);
+  const [isMapPopupMinimized, setIsMapPopupMinimized] = useState(false); // State untuk fitur minimize popup peta
   
-  const [routeInfo, setRouteInfo] = useState(null); // Menyimpan informasi jarak dan waktu rute
+  const [routeInfo, setRouteInfo] = useState(null); 
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
   const [formGenerate, setFormGenerate] = useState({
@@ -357,12 +361,18 @@ export default function App() {
     }
   }, [activeMenu, isLeafletLoaded]);
 
-  // Hapus rute jika popup diclose
+  // Hapus rute jika popup diclose dan reset status minimize
   useEffect(() => {
-    if (!selectedMapMerchant && routeLayerRef.current && mapRef.current) {
-        mapRef.current.removeLayer(routeLayerRef.current);
-        routeLayerRef.current = null;
+    if (!selectedMapMerchant) {
+        if (routeLayerRef.current && mapRef.current) {
+            mapRef.current.removeLayer(routeLayerRef.current);
+            routeLayerRef.current = null;
+        }
         setRouteInfo(null);
+        setIsMapPopupMinimized(false);
+    } else {
+        // Reset minimize saat pilih pedagang baru
+        setIsMapPopupMinimized(false);
     }
   }, [selectedMapMerchant]);
 
@@ -477,11 +487,12 @@ export default function App() {
      if (mapRef.current && m.lat && m.lng) {
         mapRef.current.flyTo([m.lat, m.lng], 19, { animate: true, duration: 1.5 });
         setSelectedMapMerchant(m);
+        setIsMapPopupMinimized(false);
         if (window.innerWidth < 1024) { const mc = document.getElementById('main-scroll-area'); if(mc) mc.scrollTo({ top: 0, behavior: 'smooth' }); }
      }
   };
 
-  // === FITUR RUTE JALAN KAKI OSRM ===
+  // === FITUR RUTE JALAN KAKI OSRM & GOOGLE MAPS ===
   const handleCalculateRoute = async () => {
      if (!selectedMapMerchant || !selectedMapMerchant.lat || !selectedMapMerchant.lng) return;
      if (!userMarkerRef.current) {
@@ -495,13 +506,11 @@ export default function App() {
      const destLng = selectedMapMerchant.lng;
 
      try {
-         // Menggunakan profil 'foot' untuk jalan kaki
          const response = await fetch(`https://router.project-osrm.org/route/v1/foot/${startLatLng.lng},${startLatLng.lat};${destLng},${destLat}?overview=full&geometries=geojson`);
          const data = await response.json();
 
          if (data.routes && data.routes.length > 0) {
              const route = data.routes[0];
-             // OSRM GeoJSON format: [longitude, latitude]. Leaflet needs [latitude, longitude].
              const latLngs = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
 
              if (routeLayerRef.current) {
@@ -512,7 +521,7 @@ export default function App() {
                  color: '#3b82f6', // blue-500
                  weight: 6,
                  opacity: 0.8,
-                 dashArray: '10, 10', // Putus-putus untuk menandakan rute pejalan kaki
+                 dashArray: '10, 10', 
                  lineJoin: 'round'
              }).addTo(mapRef.current);
 
@@ -521,19 +530,37 @@ export default function App() {
              const distanceInMeters = route.distance;
              const durationInSeconds = route.duration;
              
-             const distStr = distanceInMeters > 1000 ? (distanceInMeters / 1000).toFixed(2) + " km" : Math.round(distanceInMeters) + " meter";
-             const durStr = Math.round(durationInSeconds / 60) + " menit";
+             const distStr = distanceInMeters > 1000 ? (distanceInMeters / 1000).toFixed(2) + " km" : Math.round(distanceInMeters) + " m";
+             const durStr = Math.round(durationInSeconds / 60) + " mnt";
 
              setRouteInfo({ distance: distStr, duration: durStr });
-             showToast(`Rute ditemukan: ${distStr} (${durStr} jalan kaki)`, "success");
+             showToast(`Rute peta berhasil dibuat.`, "success");
+             
+             // UX: Otomatis mengecilkan popup agar petugas bisa melihat map dengan jelas
+             setIsMapPopupMinimized(true);
          } else {
-             showToast("Tidak dapat menemukan rute pejalan kaki ke lokasi tersebut.", "error");
+             showToast("Tidak dapat menemukan rute ke lokasi tersebut di peta internal.", "error");
          }
      } catch (err) {
-         showToast("Gagal mengambil data rute dari server OSRM.", "error");
+         showToast("Gagal mengambil data rute dari server peta.", "error");
      } finally {
          setIsCalculatingRoute(false);
      }
+  };
+
+  const handleOpenGoogleMapsRoute = () => {
+      if (!selectedMapMerchant || !selectedMapMerchant.lat || !selectedMapMerchant.lng) return;
+      if (!userMarkerRef.current) {
+         showToast("Mohon aktifkan Lokasi GPS Anda terlebih dahulu untuk menggunakan navigasi Google Maps.", "error");
+         return;
+      }
+      const startLatLng = userMarkerRef.current.getLatLng();
+      const destLat = selectedMapMerchant.lat;
+      const destLng = selectedMapMerchant.lng;
+      
+      // Buka URL Deep Link Google Maps rute jalan kaki
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${startLatLng.lat},${startLatLng.lng}&destination=${destLat},${destLng}&travelmode=walking`;
+      window.open(url, '_blank');
   };
 
   const handleDayClick = (day) => {
@@ -553,7 +580,6 @@ export default function App() {
     showToast("Jadwal kalender berhasil diperbarui.", "success");
   };
 
-  // === DIPERBAIKI: MULTIPLE API FAILOVER SYSTEM UNTUK SKB 3 MENTERI + CEK HARI INI ===
   const handleSyncHolidays = async () => {
     if (userRole !== 'admin') return;
     setIsSyncing(true);
@@ -578,7 +604,6 @@ export default function App() {
            const isCuti = item.is_cuti === true || String(ket).toLowerCase().includes('cuti bersama');
            
            if (tgl && ket && String(tgl).startsWith(String(calYear))) { 
-               // Bedakan Libur Nasional vs Cuti Bersama untuk kejelasan
                const finalName = isCuti ? `Cuti Bersama: ${ket.replace(/Cuti Bersama/i, '').trim()}` : ket;
                newSpecialDates[tgl] = { type: 'LIBUR', name: finalName }; 
                added++; 
@@ -587,10 +612,7 @@ export default function App() {
          
          if (added > 0) {
              setSpecialDates(newSpecialDates); 
-             
-             // FITUR BARU: CEK APAKAH HARI INI CUTI BERSAMA/LIBUR NASIONAL
              const today = new Date();
-             // Menyesuaikan waktu lokal ke YYYY-MM-DD
              const tzOffset = today.getTimezoneOffset() * 60000;
              const localISOTime = (new Date(today - tzOffset)).toISOString().slice(0, -1);
              const todayStr = localISOTime.split('T')[0];
@@ -598,7 +620,7 @@ export default function App() {
              if (newSpecialDates[todayStr]) {
                  setTimeout(() => {
                      showToast(`Pemberitahuan SKB: Hari ini (${todayStr}) tercatat sebagai ${newSpecialDates[todayStr].name}. Tarif tagihan disesuaikan.`, "info");
-                 }, 4500); // Tampilkan setelah toast sukses selesai
+                 }, 4500);
              }
 
              showToast(`Sinkronisasi sukses! ${added} Hari Libur & Cuti Bersama dari SKB ditarik.`, "success");
@@ -609,7 +631,6 @@ export default function App() {
          throw new Error('Semua jalur API kosong/gagal.');
       }
     } catch (error) { 
-      // FALLBACK SKB 2026 OFFLINE
       const fallback2026 = {
          "2026-01-01": { type: "LIBUR", name: "Tahun Baru Masehi" },
          "2026-02-17": { type: "LIBUR", name: "Isra Mikraj" },
@@ -619,7 +640,7 @@ export default function App() {
          "2026-04-03": { type: "LIBUR", name: "Wafat Isa Al Masih" },
          "2026-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
          "2026-05-14": { type: "LIBUR", name: "Kenaikan Isa Al Masih" },
-         "2026-05-15": { type: "LIBUR", name: "Cuti Bersama Kenaikan Isa Al Masih" }, // Contoh tambahan untuk antisipasi
+         "2026-05-15": { type: "LIBUR", name: "Cuti Bersama Kenaikan Isa Al Masih" }, 
          "2026-05-26": { type: "LIBUR", name: "Hari Raya Waisak" },
          "2026-05-27": { type: "LIBUR", name: "Idul Adha" },
          "2026-07-16": { type: "LIBUR", name: "Tahun Baru Islam" },
@@ -1202,7 +1223,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 2. KONTEN PETA (DENGAN ANIMASI & RUTE OSRM) */}
+                {/* 2. KONTEN PETA (DENGAN ANIMASI & RUTE) */}
                 {activeMenu === 'peta' && (
                   <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-8rem)] animate-in fade-in relative">
                     <div className="w-full h-[55vh] lg:h-auto lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
@@ -1229,68 +1250,113 @@ export default function App() {
 
                        {/* KARTU DETAIL PETA MELAYANG SAAT MARKER DIKLIK */}
                        {selectedMapMerchant && (
-                          <div className="absolute bottom-4 left-4 right-16 sm:left-auto sm:right-20 sm:w-80 bg-white p-4 rounded-2xl shadow-2xl border border-slate-200 z-[2000] animate-in slide-in-from-bottom-4">
-                             <button onClick={() => setSelectedMapMerchant(null)} className="absolute top-3 right-3 p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full z-10"><X className="w-4 h-4 text-slate-600"/></button>
-                             
-                             {selectedMapMerchant.fotoLapak && (
-                                <div className="h-32 w-full rounded-xl overflow-hidden mb-3 bg-slate-100">
-                                   <img src={selectedMapMerchant.fotoLapak} className="w-full h-full object-cover" alt="Foto Lapak" />
+                          <div className={`absolute bottom-4 left-4 right-16 sm:left-auto sm:right-20 ${isMapPopupMinimized ? 'w-auto max-w-[80%]' : 'sm:w-80'} bg-white rounded-2xl shadow-2xl border border-slate-200 z-[2000] transition-all duration-300 ${isMapPopupMinimized ? 'p-3' : 'p-4'}`}>
+                             {/* Minimize Toggle Button */}
+                             <button onClick={() => setIsMapPopupMinimized(!isMapPopupMinimized)} className="absolute top-3 right-10 p-1.5 bg-slate-100 hover:bg-slate-200 rounded-full z-10 transition-colors" title={isMapPopupMinimized ? "Perbesar" : "Kecilkan"}>
+                                {isMapPopupMinimized ? <ChevronUp className="w-4 h-4 text-slate-600"/> : <ChevronDown className="w-4 h-4 text-slate-600"/>}
+                             </button>
+                             {/* Close Button */}
+                             <button onClick={() => setSelectedMapMerchant(null)} className="absolute top-3 right-3 p-1.5 bg-red-50 hover:bg-red-100 rounded-full z-10 transition-colors" title="Tutup">
+                                <X className="w-4 h-4 text-red-500"/>
+                             </button>
+
+                             {isMapPopupMinimized ? (
+                                /* TAMPILAN KETIKA DI-MINIMIZE (KECIL) */
+                                <div className="flex items-center gap-3 pr-14 cursor-pointer" onClick={() => setIsMapPopupMinimized(false)}>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border-2 ${selectedMapMerchant.totalTunggakan > 0 ? 'bg-red-100 border-red-300' : 'bg-emerald-100 border-emerald-300'}`}>
+                                        <Store className={`w-4 h-4 ${selectedMapMerchant.totalTunggakan > 0 ? 'text-red-600' : 'text-emerald-600'}`}/>
+                                    </div>
+                                    <div className="truncate">
+                                        <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{selectedMapMerchant.nama}</h4>
+                                        {routeInfo ? (
+                                           <p className="text-[10px] text-blue-600 font-bold truncate flex items-center gap-1"><PersonWalking className="w-3 h-3"/> {routeInfo.distance} • {routeInfo.duration}</p>
+                                        ) : (
+                                           <p className="text-[10px] text-slate-500 truncate">{selectedMapMerchant.keterangan}</p>
+                                        )}
+                                    </div>
+                                </div>
+                             ) : (
+                                /* TAMPILAN NORMAL (BESAR) */
+                                <div className="animate-in fade-in zoom-in-95 duration-200">
+                                   {selectedMapMerchant.fotoLapak && (
+                                      <div className="h-32 w-full rounded-xl overflow-hidden mb-3 bg-slate-100 mt-7 sm:mt-0">
+                                         <img src={selectedMapMerchant.fotoLapak} className="w-full h-full object-cover" alt="Foto Lapak" />
+                                      </div>
+                                   )}
+                                   
+                                   <div className={`flex gap-2 items-center mb-1.5 ${!selectedMapMerchant.fotoLapak ? 'mt-8 sm:mt-0' : ''}`}>
+                                      <span className="bg-blue-100 text-blue-800 text-[9px] font-extrabold px-2 py-0.5 rounded tracking-wide border border-blue-200">{selectedMapMerchant.kategori}</span>
+                                      <span className="font-mono text-[10px] font-bold text-slate-500">{selectedMapMerchant.accountId}</span>
+                                   </div>
+                                   
+                                   <h4 className="font-bold text-slate-800 leading-tight mb-1 text-base pr-8">{selectedMapMerchant.nama}</h4>
+                                   <p className="text-xs text-slate-500 flex items-start gap-1"><MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-500"/> <span className="line-clamp-2">{selectedMapMerchant.keterangan}</span></p>
+                                   
+                                   <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center bg-slate-50 rounded-lg p-2 mb-3">
+                                      {selectedMapMerchant.totalTunggakan > 0 ? (
+                                         <div>
+                                            <p className="text-[10px] text-red-500 font-bold uppercase tracking-wide">Tunggakan Terdata</p>
+                                            <p className="text-sm font-black text-red-600">{formatRp(selectedMapMerchant.totalTunggakan)}</p>
+                                         </div>
+                                      ) : (
+                                         <div className="flex items-center gap-1.5 text-emerald-700">
+                                            <CheckCircle className="w-5 h-5"/>
+                                            <div>
+                                               <p className="text-xs font-bold">Lunas / Aman</p>
+                                               <p className="text-[9px] font-medium opacity-80">Tidak ada tunggakan</p>
+                                            </div>
+                                         </div>
+                                      )}
+                                      <button onClick={() => flyToMerchantOnMap(selectedMapMerchant)} className="p-2.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 shadow-sm transition-colors" title="Pusatkan Peta"><Crosshair className="w-4 h-4"/></button>
+                                   </div>
+
+                                   {/* FITUR TOMBOL RUTE JALAN KAKI */}
+                                   <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 mt-1">
+                                      <p className="text-[10px] font-bold text-slate-500 text-center mb-1">Pilih metode panduan arah:</p>
+                                      
+                                      <div className="grid grid-cols-2 gap-2">
+                                          <button 
+                                             onClick={handleCalculateRoute} 
+                                             disabled={isCalculatingRoute || !isTrackingLocation}
+                                             className={`w-full py-2.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors ${!isTrackingLocation ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 shadow-sm'}`}
+                                             title="Gambar rute garis di peta aplikasi"
+                                          >
+                                             {isCalculatingRoute ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <RouteIcon className="w-3.5 h-3.5"/>} 
+                                             Rute Peta
+                                          </button>
+                                          
+                                          <button 
+                                             onClick={handleOpenGoogleMapsRoute} 
+                                             disabled={!isTrackingLocation}
+                                             className={`w-full py-2.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors ${!isTrackingLocation ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'}`}
+                                             title="Buka rute akurat via Google Maps"
+                                          >
+                                             <ExternalLink className="w-3.5 h-3.5"/> 
+                                             Google Maps
+                                          </button>
+                                      </div>
+                                      
+                                      {routeInfo && (
+                                         <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-lg flex items-center justify-between text-emerald-800 mt-1">
+                                            <div className="flex items-center gap-2">
+                                               <PersonWalking className="w-4 h-4"/>
+                                               <div className="text-[10px] font-bold leading-tight">
+                                                  <p>Estimasi Tiba:</p>
+                                                  <p className="text-xs font-black">{routeInfo.duration}</p>
+                                               </div>
+                                            </div>
+                                            <div className="text-right text-[10px] font-bold">
+                                               <p>Jarak Tempuh:</p>
+                                               <p className="text-xs">{routeInfo.distance}</p>
+                                            </div>
+                                         </div>
+                                      )}
+                                      {!isTrackingLocation && (
+                                         <p className="text-[9px] text-red-500 font-bold text-center mt-1">⚠️ Aktifkan GPS lokasi Anda terlebih dahulu.</p>
+                                      )}
+                                   </div>
                                 </div>
                              )}
-                             
-                             <div className="flex gap-2 items-center mb-1.5">
-                                <span className="bg-blue-100 text-blue-800 text-[9px] font-extrabold px-2 py-0.5 rounded tracking-wide border border-blue-200">{selectedMapMerchant.kategori}</span>
-                                <span className="font-mono text-[10px] font-bold text-slate-500">{selectedMapMerchant.accountId}</span>
-                             </div>
-                             
-                             <h4 className="font-bold text-slate-800 leading-tight mb-1 text-base">{selectedMapMerchant.nama}</h4>
-                             <p className="text-xs text-slate-500 flex items-start gap-1"><MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-500"/> <span className="line-clamp-2">{selectedMapMerchant.keterangan}</span></p>
-                             
-                             <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center bg-slate-50 rounded-lg p-2 mb-3">
-                                {selectedMapMerchant.totalTunggakan > 0 ? (
-                                   <div>
-                                      <p className="text-[10px] text-red-500 font-bold uppercase tracking-wide">Tunggakan Terdata</p>
-                                      <p className="text-sm font-black text-red-600">{formatRp(selectedMapMerchant.totalTunggakan)}</p>
-                                   </div>
-                                ) : (
-                                   <div className="flex items-center gap-1.5 text-emerald-700">
-                                      <CheckCircle className="w-5 h-5"/>
-                                      <div>
-                                         <p className="text-xs font-bold">Lunas / Aman</p>
-                                         <p className="text-[9px] font-medium opacity-80">Tidak ada tunggakan</p>
-                                      </div>
-                                   </div>
-                                )}
-                                <button onClick={() => { flyToMerchantOnMap(selectedMapMerchant); }} className="p-2.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 shadow-sm" title="Pusatkan Peta"><Crosshair className="w-4 h-4"/></button>
-                             </div>
-
-                             {/* FITUR TOMBOL RUTE JALAN KAKI */}
-                             <div className="flex flex-col gap-2">
-                                <button 
-                                   onClick={handleCalculateRoute} 
-                                   disabled={isCalculatingRoute || !isTrackingLocation}
-                                   className={`w-full py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors ${!isTrackingLocation ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'}`}
-                                >
-                                   {isCalculatingRoute ? <Loader2 className="w-4 h-4 animate-spin"/> : <RouteIcon className="w-4 h-4"/>} 
-                                   {!isTrackingLocation ? 'Aktifkan GPS Dulu' : 'Rute Jalan Kaki'}
-                                </button>
-                                
-                                {routeInfo && (
-                                   <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-lg flex items-center justify-between text-emerald-800">
-                                      <div className="flex items-center gap-2">
-                                         <PersonWalking className="w-4 h-4"/>
-                                         <div className="text-[10px] font-bold leading-tight">
-                                            <p>Estimasi Tiba:</p>
-                                            <p className="text-xs font-black">{routeInfo.duration}</p>
-                                         </div>
-                                      </div>
-                                      <div className="text-right text-[10px] font-bold">
-                                         <p>Jarak Tempuh:</p>
-                                         <p className="text-xs">{routeInfo.distance}</p>
-                                      </div>
-                                   </div>
-                                )}
-                             </div>
                           </div>
                        )}
 
@@ -1542,7 +1608,6 @@ export default function App() {
                             const firstDayIndex = new Date(calYear, calMonth - 1, 1).getDay();
                             const days = [];
                             
-                            // Mendapatkan format string untuk hari ini dengan zona waktu lokal
                             const today = new Date();
                             const tzOffset = today.getTimezoneOffset() * 60000;
                             const todayStr = (new Date(today - tzOffset)).toISOString().split('T')[0];
