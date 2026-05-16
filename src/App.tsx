@@ -1143,8 +1143,21 @@ export default function App() {
   const masterDataStats = useMemo(() => {
     const kategoriCount = { 'PKL': 0, 'LOKSEM': 0, 'TIKAR': 0, 'JURU FOTO': 0, 'LISTRIK': 0 };
     merchants.forEach(m => { if (kategoriCount[m.kategori] !== undefined) kategoriCount[m.kategori]++; });
-    return { total: merchants.length, kategori: kategoriCount };
-  }, [merchants]);
+
+    // Hitung komposisi jenis usaha berdasarkan lokasi yang dipilih
+    const sumberData = filterLokasi === 'Semua' ? merchants : merchants.filter(m => m.keterangan === filterLokasi);
+    const jenisUsahaMap: Record<string, number> = {};
+    sumberData.forEach(m => {
+      const j = (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha.trim() : 'Belum Ada Data';
+      jenisUsahaMap[j] = (jenisUsahaMap[j] || 0) + 1;
+    });
+    // Urutkan terbanyak di atas
+    const jenisUsahaSorted = Object.entries(jenisUsahaMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10); // max 10 jenis teratas
+
+    return { total: merchants.length, kategori: kategoriCount, jenisUsahaSorted, lokasiTotal: sumberData.length };
+  }, [merchants, filterLokasi]);
 
   const handleMenuClick = (menu) => { setActiveMenu(menu); setIsMobileMenuOpen(false); };
 
@@ -1816,11 +1829,92 @@ export default function App() {
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center gap-4">
-                        <div className="relative flex-grow max-w-sm">
-                          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                          <input type="text" placeholder="Cari Nama / NIK / ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"/>
+                      {/* ── FILTER BAR ── */}
+                      <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-3">
+                        {/* Baris 1: Search + Dropdowns */}
+                        <div className="flex flex-wrap items-center gap-3">
+                          {/* Search */}
+                          <div className="relative flex-grow min-w-[200px] max-w-xs">
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input type="text" placeholder="Cari Nama / NIK / ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"/>
+                          </div>
+
+                          {/* Filter Lokasi */}
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-slate-500 shrink-0" />
+                            <select
+                              value={filterLokasi}
+                              onChange={(e) => setFilterLokasi(e.target.value)}
+                              className={`px-3 py-2 border rounded-lg outline-none text-sm font-semibold cursor-pointer focus:ring-2 focus:ring-blue-500 min-w-[160px]
+                                ${filterLokasi !== 'Semua' ? 'border-green-500 bg-green-50 text-green-800 ring-1 ring-green-400' : 'border-slate-300 bg-white text-slate-700'}`}
+                            >
+                              <option value="Semua">📍 Semua Lokasi</option>
+                              {uniqueLokasi.map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+                          </div>
+
+                          {/* Filter Jenis Usaha */}
+                          <div className="flex items-center gap-2">
+                            <Store className="w-4 h-4 text-slate-500 shrink-0" />
+                            <select
+                              value={filterJenisUsaha}
+                              onChange={(e) => setFilterJenisUsaha(e.target.value)}
+                              className={`px-3 py-2 border rounded-lg outline-none text-sm font-semibold cursor-pointer focus:ring-2 focus:ring-blue-500 min-w-[180px]
+                                ${filterJenisUsaha !== 'Semua' ? 'border-purple-500 bg-purple-50 text-purple-800 ring-1 ring-purple-400' : 'border-slate-300 bg-white text-slate-700'}`}
+                            >
+                              <option value="Semua">🛒 Semua Jenis Usaha</option>
+                              {uniqueJenisUsaha.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                          </div>
+
+                          {/* Reset & counter */}
+                          <div className="flex items-center gap-2 ml-auto">
+                            <span className="text-xs text-slate-500 font-semibold bg-slate-200 px-2.5 py-1 rounded-full">
+                              {filteredDashboardMerchants.length} / {merchants.length} data
+                            </span>
+                            {(filterLokasi !== 'Semua' || filterJenisUsaha !== 'Semua' || filterKategoriDashboard !== 'Semua' || searchTerm) && (
+                              <button
+                                onClick={() => { setFilterLokasi('Semua'); setFilterJenisUsaha('Semua'); setFilterKategoriDashboard('Semua'); setSearchTerm(''); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold transition-colors"
+                              >
+                                <XCircle className="w-3.5 h-3.5" /> Reset Filter
+                              </button>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Baris 2: Insight Komposisi Jenis Usaha per Lokasi */}
+                        {masterDataStats.jenisUsahaSorted.length > 0 && (
+                          <div className="pt-2 border-t border-slate-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                                Komposisi Jenis Usaha
+                                {filterLokasi !== 'Semua' ? ` — ${filterLokasi}` : ' — Semua Lokasi'}
+                                <span className="ml-1 text-slate-400 font-normal">({masterDataStats.lokasiTotal} pedagang)</span>
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {masterDataStats.jenisUsahaSorted.map(([jenis, count]) => (
+                                <button
+                                  key={jenis}
+                                  onClick={() => setFilterJenisUsaha(filterJenisUsaha === jenis ? 'Semua' : jenis)}
+                                  title={`Filter: ${jenis}`}
+                                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:-translate-y-0.5 active:scale-95
+                                    ${filterJenisUsaha === jenis
+                                      ? 'bg-purple-600 text-white border-purple-600 shadow-md'
+                                      : 'bg-white text-slate-700 border-slate-300 hover:border-purple-400 hover:text-purple-700'}`}
+                                >
+                                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0
+                                    ${filterJenisUsaha === jenis ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                    {count}
+                                  </span>
+                                  {jenis}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       
                       {/* TAMPILAN TABEL (DESKTOP) */}
