@@ -324,6 +324,8 @@ export default function App() {
   const [calendarModal, setCalendarModal] = useState({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' });
 
   const [selectedZone, setSelectedZone] = useState('SEMUA AREA');
+  const [filterMapKategori, setFilterMapKategori] = useState('Semua');
+  const [filterMapJenis, setFilterMapJenis] = useState('Semua');
   const mapRef = useRef(null);
   const markersRef = useRef({});
   const userMarkerRef = useRef(null);
@@ -1622,30 +1624,103 @@ export default function App() {
                        )}
 
                        <div id="ragunan-map" className="w-full h-full z-0"></div>
-                       
-                       {!isLeafletLoaded && (
-                         <div className="absolute inset-0 bg-slate-100 flex items-center justify-center flex-col z-10">
-                           <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-blue-500 mb-2" />
-                           <p className="text-xs sm:text-sm font-bold text-slate-500">Memuat Engine Peta...</p>
-                         </div>
-                       )}
-                    </div>
+                        
+                        {!isLeafletLoaded && (
+                          <div className="absolute inset-0 bg-slate-100 flex items-center justify-center flex-col z-10">
+                            <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-blue-500 mb-2" />
+                            <p className="text-xs sm:text-sm font-bold text-slate-500">Memuat Engine Peta...</p>
+                          </div>
+                        )}
+                     </div>
 
-                    <div className="w-full h-[60vh] lg:h-auto lg:w-[380px] bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden shrink-0 z-10 relative">
-                       <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 shrink-0">
-                          <label className="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1.5 sm:mb-2 uppercase tracking-widest"><Filter className="w-3.5 h-3.5 inline mb-0.5"/> Filter Zonasi Peta</label>
-                          <select value={selectedZone} onChange={e => { setSelectedZone(e.target.value); setSelectedMapMerchant(null); }} className="w-full px-3 py-2 sm:py-2.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm font-bold text-slate-700 shadow-sm outline-none cursor-pointer focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            {mapZonesData.map((z, i) => <option key={i} value={z.id}>{z.name}</option>)}
-                          </select>
-                       </div>
+                     <div className="w-full h-[60vh] lg:h-auto lg:w-[380px] bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden shrink-0 z-10 relative">
+                        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 shrink-0">
+                           <label className="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1.5 sm:mb-2 uppercase tracking-widest"><Filter className="w-3.5 h-3.5 inline mb-0.5"/> Filter Zonasi Peta</label>
+                           <select value={selectedZone} onChange={e => { setSelectedZone(e.target.value); setSelectedMapMerchant(null); }} className="w-full px-3 py-2 sm:py-2.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm font-bold text-slate-700 shadow-sm outline-none cursor-pointer focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                             {mapZonesData.map((z, i) => <option key={i} value={z.id}>{z.name}</option>)}
+                           </select>
+                        </div>
 
                        {(() => {
-                         const merchantsInZone = merchants.filter(m => selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')));
+                         // Filter berdasarkan zona, kategori, dan jenis usaha
+                         const merchantsInZoneBase = merchants.filter(m => selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')));
+                         const merchantsInZone = merchantsInZoneBase.filter(m => {
+                            const matchKat = filterMapKategori === 'Semua' || m.kategori === filterMapKategori;
+                            const matchJenis = filterMapJenis === 'Semua' || (m.jenisUsaha && m.jenisUsaha.trim() === filterMapJenis);
+                            return matchKat && matchJenis;
+                         });
+                         
+                         const jenisMapSorted = Object.entries(merchantsInZoneBase.reduce((acc, m) => {
+                            if (m.jenisUsaha && m.jenisUsaha !== '-') acc[m.jenisUsaha] = (acc[m.jenisUsaha] || 0) + 1;
+                            return acc;
+                         }, {})).sort((a,b) => b[1] - a[1]);
+
                          const nunggakCount = merchantsInZone.filter(m => m.totalTunggakan > 0).length;
                          const totalUangNunggak = merchantsInZone.reduce((sum, m) => sum + m.totalTunggakan, 0);
 
-                         return (
-                           <>
+                          return (
+                            <>
+                              {/* ── FILTER KATEGORI & JENIS DI SIDEBAR ── */}
+                              <div className="p-3 border-b border-slate-200 bg-white space-y-2.5">
+                                {/* Chips Kategori */}
+                                <div>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Filter Kategori</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {['Semua', 'PKL', 'LOKSEM', 'TIKAR', 'JURU FOTO', 'LISTRIK'].map(k => (
+                                      <button
+                                        key={k}
+                                        onClick={() => { setFilterMapKategori(k); setSelectedMapMerchant(null); }}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95
+                                          ${filterMapKategori === k
+                                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                            : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600'}`}
+                                      >
+                                        {k === 'Semua' ? '🗂 Semua' : k}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Chips Jenis Usaha */}
+                                {jenisMapSorted.length > 0 && (
+                                  <div>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Jenis Usaha di Area Ini</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {jenisMapSorted.map(([jenis, count]) => (
+                                        <button
+                                          key={jenis}
+                                          onClick={() => { setFilterMapJenis(filterMapJenis === jenis ? 'Semua' : jenis); setSelectedMapMerchant(null); }}
+                                          title={`Filter: ${jenis}`}
+                                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95
+                                            ${filterMapJenis === jenis
+                                              ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                              : 'bg-white text-slate-600 border-slate-300 hover:border-purple-400 hover:text-purple-700'}`}
+                                        >
+                                          <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black
+                                            ${filterMapJenis === jenis ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                                          {jenis}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Reset + counter */}
+                                {(filterMapKategori !== 'Semua' || filterMapJenis !== 'Semua') && (
+                                  <div className="flex items-center justify-between pt-1">
+                                    <span className="text-[10px] text-slate-500 font-semibold">
+                                      Menampilkan <strong>{merchantsInZone.length}</strong> dari {merchantsInZoneBase.length} pedagang
+                                    </span>
+                                    <button
+                                      onClick={() => { setFilterMapKategori('Semua'); setFilterMapJenis('Semua'); setSelectedMapMerchant(null); }}
+                                      className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-700 font-bold"
+                                    >
+                                      <XCircle className="w-3 h-3" /> Reset
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
                              <div className="p-4 sm:p-5 bg-slate-800 text-white shrink-0">
                                <div className="flex justify-between items-start mb-3 sm:mb-4">
                                  <div>
@@ -2058,6 +2133,18 @@ export default function App() {
                         </div>
                         <div className="grid grid-cols-7 gap-2">
                           {(() => {
+                          // Hitung jenis usaha unik di zone ini (sebelum filter jenis)
+                          const merchantsInZoneBase = merchants.filter(m => {
+                            const matchZone = selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', ''));
+                            const matchKat = filterMapKategori === 'Semua' || m.kategori === filterMapKategori;
+                            return matchZone && matchKat;
+                          });
+                          const jenisMapMap: Record<string, number> = {};
+                          merchantsInZoneBase.forEach(m => {
+                            const j = (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha.trim() : 'Belum Ada Data';
+                            jenisMapMap[j] = (jenisMapMap[j] || 0) + 1;
+                          });
+                          const jenisMapSorted = Object.entries(jenisMapMap).sort((a, b) => b[1] - a[1]).slice(0, 12);
                             const daysInMonth = new Date(calYear, calMonth, 0).getDate();
                             const firstDayIndex = new Date(calYear, calMonth - 1, 1).getDay();
                             const days = [];
