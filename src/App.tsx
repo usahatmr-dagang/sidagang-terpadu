@@ -397,7 +397,7 @@ export default function App() {
 
   // INIT LEAFLET MAP
   useEffect(() => {
-    if (activeMenu === 'peta' && isLeafletLoaded && user) {
+    if (activeMenu === 'peta' && isLeafletLoaded && appUser) {
       const initTimeout = setTimeout(() => {
         if (!mapRef.current && document.getElementById('ragunan-map')) {
            const ragunanBounds = window.L.latLngBounds([ [-6.325000, 106.810000], [-6.295000, 106.835000] ]);
@@ -418,7 +418,7 @@ export default function App() {
          setIsTrackingLocation(false); mapRef.current.remove(); mapRef.current = null; userMarkerRef.current = null; setSelectedMapMerchant(null); routeLayerRef.current = null; setRouteInfo(null);
       }
     }
-  }, [activeMenu, isLeafletLoaded, user]);
+  }, [activeMenu, isLeafletLoaded, appUser]);
 
   // Hapus rute jika popup diclose dan reset status minimize
   useEffect(() => {
