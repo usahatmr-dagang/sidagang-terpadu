@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 
 // =========================================================================
-// 🔑 MASUKKAN GOOGLE MAPS API KEY ANDA DI SINI
+// 🔑 MASUKKAN GOOGLE MAPS API KEY ANDA DI SINI (NANTI)
 // =========================================================================
 const GOOGLE_MAPS_API_KEY = ""; // Contoh: "AIzaSyB-xxxxxx..."
 // =========================================================================
@@ -149,7 +149,7 @@ export default function App() {
     setConfirmDialog({ show: true, message, onConfirm: () => { actionFn(); setConfirmDialog({show:false}); } });
   };
 
-  // === FITUR AUTO LOGOUT JIKA TIDAK ADA AKTIVITAS (10 MENIT) ===
+  // === FITUR AUTO LOGOUT ===
   useEffect(() => {
     let timeoutId;
     const INACTIVITY_TIME = 10 * 60 * 1000;
@@ -157,7 +157,7 @@ export default function App() {
     const handleInactivityLogout = async () => {
       if (auth.currentUser) {
         await signOut(auth);
-        setToast({ show: true, message: 'Sesi Anda telah berakhir secara otomatis karena tidak ada aktivitas selama 10 menit.', type: 'info' });
+        setToast({ show: true, message: 'Sesi Anda telah berakhir otomatis karena tidak ada aktivitas.', type: 'info' });
         setTimeout(() => setToast({ show: false, message: '', type: 'info' }), 6000);
       }
     };
@@ -390,7 +390,7 @@ export default function App() {
     }
   }, [selectedMapMerchant]);
 
-  // RENDER PINS KE PETA (DENGAN ANIMASI BIP-BIP)
+  // RENDER PINS KE PETA
   useEffect(() => {
     if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
     
@@ -430,7 +430,7 @@ export default function App() {
     return () => clearTimeout(renderTimeout);
   }, [merchants, activeMenu, isLeafletLoaded, selectedZone]);
 
-  // EFFECT UNTUK UPDATE PIN "BIP-BIP" KETIKA DIPILIH
+  // EFFECT UNTUK UPDATE PIN "BIP-BIP"
   useEffect(() => {
      if (activeMenu !== 'peta' || !mapRef.current || !isLeafletLoaded) return;
 
@@ -506,7 +506,7 @@ export default function App() {
      }
   };
 
-  // === FITUR HYBRID ROUTING (GOOGLE MAPS SDK + LEAFLET UI) ===
+  // === FITUR HYBRID ROUTING: Detail Jalur Pejalan Kaki Dipercantik (Mirip Google Maps) ===
   const handleCalculateRoute = async () => {
      if (!selectedMapMerchant || !selectedMapMerchant.lat || !selectedMapMerchant.lng) return;
      if (!userMarkerRef.current) {
@@ -519,12 +519,11 @@ export default function App() {
      const destLat = selectedMapMerchant.lat;
      const destLng = selectedMapMerchant.lng;
 
-     // 1. CEK JIKA API KEY GOOGLE MAPS TERSEDIA DAN SCRIPT SUDAH TERLOAD
+     // 1. CEK JIKA API KEY GOOGLE MAPS TERSEDIA 
      if (GOOGLE_MAPS_API_KEY && window.google && window.google.maps) {
          try {
              const directionsService = new window.google.maps.DirectionsService();
              
-             // Minta rute resmi dari Google Maps API
              directionsService.route({
                  origin: { lat: startLatLng.lat, lng: startLatLng.lng },
                  destination: { lat: destLat, lng: destLng },
@@ -532,32 +531,19 @@ export default function App() {
              }, (response, status) => {
                  if (status === 'OK' && response.routes && response.routes.length > 0) {
                      const route = response.routes[0];
-                     
-                     // Ambil koordinat garis rute dari Google, ubah formatnya ke Leaflet [lat, lng]
                      const pathCoordinates = route.overview_path.map(p => [p.lat(), p.lng()]);
 
-                     if (routeLayerRef.current) {
-                         mapRef.current.removeLayer(routeLayerRef.current);
-                     }
+                     if (routeLayerRef.current) { mapRef.current.removeLayer(routeLayerRef.current); }
 
-                     // Gambar garis rute Google Maps MENGGUNAKAN engine Leaflet di peta kita
-                     routeLayerRef.current = window.L.polyline(pathCoordinates, {
-                         color: '#3b82f6', // blue-500
-                         weight: 6,
-                         opacity: 0.8,
-                         dashArray: '10, 10', 
-                         lineJoin: 'round'
-                     }).addTo(mapRef.current);
-
+                     // Membuat layer grup agar rute pejalan kaki lebih detail (Titik Biru + Outline Putih)
+                     const outlineGmap = window.L.polyline(pathCoordinates, { color: '#ffffff', weight: 8, opacity: 0.9, lineJoin: 'round' });
+                     const pathGmap = window.L.polyline(pathCoordinates, { color: '#2563eb', weight: 5, opacity: 1, dashArray: '1, 10', lineCap: 'round', lineJoin: 'round' });
+                     
+                     routeLayerRef.current = window.L.featureGroup([outlineGmap, pathGmap]).addTo(mapRef.current);
                      mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [50, 50] });
 
-                     // Ambil teks estimasi jarak dan waktu resmi dari Google Maps
-                     const distanceStr = route.legs[0].distance.text;
-                     const durationStr = route.legs[0].duration.text;
-
-                     setRouteInfo({ distance: distanceStr, duration: durationStr, source: 'Google Maps' });
+                     setRouteInfo({ distance: route.legs[0].distance.text, duration: route.legs[0].duration.text, source: 'Google Maps' });
                      showToast(`Rute Akurat Google Maps berhasil dibuat.`, "success");
-                     
                      setIsMapPopupMinimized(true);
                  } else {
                      showToast("Gagal memuat rute dari Google Maps. Mencoba server cadangan...", "error");
@@ -569,12 +555,12 @@ export default function App() {
              fallbackToOSRM(startLatLng, destLat, destLng);
          }
      } else {
-         // 2. JIKA API KEY KOSONG, PAKAI SERVER GRATIS OSRM (SEBAGAI CADANGAN)
+         // 2. JIKA API KEY KOSONG, PAKAI OSRM DENGAN UI YANG DIPERCANTIK
          fallbackToOSRM(startLatLng, destLat, destLng);
      }
   };
 
-  // Fungsi cadangan jika API Key Google belum dimasukkan
+  // Fungsi cadangan OSRM yang UI-nya sudah di-upgrade mirip Google Maps
   const fallbackToOSRM = async (startLatLng, destLat, destLng) => {
      try {
          const response = await fetch(`https://router.project-osrm.org/route/v1/foot/${startLatLng.lng},${startLatLng.lat};${destLng},${destLat}?overview=full&geometries=geojson`);
@@ -586,10 +572,17 @@ export default function App() {
 
              if (routeLayerRef.current) mapRef.current.removeLayer(routeLayerRef.current);
 
-             routeLayerRef.current = window.L.polyline(latLngs, {
-                 color: '#3b82f6', weight: 6, opacity: 0.8, dashArray: '10, 10', lineJoin: 'round'
-             }).addTo(mapRef.current);
+             // UPGRADE UI: Menggunakan 2 layer bertumpuk (Outline Putih + Titik Biru)
+             // Ini membuat visual rute pejalan kaki identik dengan gaya Google Maps
+             const outlineLayer = window.L.polyline(latLngs, {
+                 color: '#ffffff', weight: 8, opacity: 0.8, lineJoin: 'round'
+             });
+             const pathLayer = window.L.polyline(latLngs, {
+                 color: '#2563eb', weight: 5, opacity: 1, dashArray: '1, 10', lineCap: 'round', lineJoin: 'round'
+             });
 
+             // featureGroup digunakan agar fungsi getBounds() tetap bisa diakses untuk auto-zoom
+             routeLayerRef.current = window.L.featureGroup([outlineLayer, pathLayer]).addTo(mapRef.current);
              mapRef.current.fitBounds(routeLayerRef.current.getBounds(), { padding: [50, 50] });
 
              const distanceInMeters = route.distance;
@@ -598,7 +591,7 @@ export default function App() {
              const durStr = Math.round(durationInSeconds / 60) + " mnt";
 
              setRouteInfo({ distance: distStr, duration: durStr, source: 'OSRM' });
-             showToast(`Rute peta berhasil dibuat (Via OSRM).`, "success");
+             showToast(`Rute jalan kaki berhasil dibuat (Via Open Source).`, "success");
              setIsMapPopupMinimized(true);
          } else {
              showToast("Tidak dapat menemukan rute ke lokasi tersebut.", "error");
@@ -1120,7 +1113,7 @@ export default function App() {
                    <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden p-2.5 text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shadow-sm"><Menu className="w-5 h-5" /></button>
                    <div>
                      <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">
-                       {activeMenu === 'dashboard' ? 'Dashboard Pemantauan Tagihan' : activeMenu === 'peta' ? 'Pemetaan Lokasi Pedagang Berbasis Google Maps' : activeMenu === 'kelola-data' ? 'Pengelolaan Master Data Pedagang' : activeMenu === 'kalender' ? 'Pengaturan Kalender & Tarif' : activeMenu === 'generate' ? 'Pembuatan File Target Bank' : activeMenu === 'manajemen-akun' ? 'Manajemen Akun Firebase' : 'Rekonsiliasi Laporan Bank'}
+                       {activeMenu === 'dashboard' ? 'Dashboard Pemantauan Tagihan' : activeMenu === 'peta' ? 'Pemetaan Lokasi Pedagang Berbasis Satelit' : activeMenu === 'kelola-data' ? 'Pengelolaan Master Data Pedagang' : activeMenu === 'kalender' ? 'Pengaturan Kalender & Tarif' : activeMenu === 'generate' ? 'Pembuatan File Target Bank' : activeMenu === 'manajemen-akun' ? 'Manajemen Akun Firebase' : 'Rekonsiliasi Laporan Bank'}
                      </h2>
                      <p className="text-xs font-medium text-slate-500 mt-1 hidden sm:block">
                        {activeMenu === 'kelola-data' ? 'Kelola identitas, titik GPS, dan potret foto lapak pedagang untuk validasi lapangan.' : 'Terkoneksi langsung ke Cloud Database Firebase.'}
@@ -1291,7 +1284,7 @@ export default function App() {
                           <div className="bg-white/90 backdrop-blur px-3 py-2 sm:px-4 sm:py-3 rounded-xl shadow-lg border border-slate-200 pointer-events-auto max-w-[60%] sm:max-w-none">
                             <h3 className="font-extrabold flex items-center gap-1.5 text-slate-800 text-xs sm:text-sm"><MapIcon className="w-4 h-4 text-blue-600 shrink-0"/> <span className="truncate">Satelit TM Ragunan</span></h3>
                             <p className="text-[9px] sm:text-[10px] text-slate-500 mt-0.5 sm:mt-1 max-w-[280px] leading-snug hidden sm:block">
-                               Data pin diambil Real-Time dari Firebase Cloud. Klik pada pin untuk melihat foto lapak & buat rute jalan kaki.
+                               Data pin diambil Real-Time dari Firebase Cloud. Klik pada pin untuk melihat foto lapak & buat rute pejalan kaki.
                             </p>
                           </div>
                           <div className="bg-white/90 backdrop-blur p-2 sm:p-3 rounded-xl shadow-lg border border-slate-200 flex flex-col gap-1.5 sm:gap-2 pointer-events-auto shrink-0">
@@ -1379,7 +1372,7 @@ export default function App() {
                                              onClick={handleCalculateRoute} 
                                              disabled={isCalculatingRoute || !isTrackingLocation}
                                              className={`w-full py-2.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors ${!isTrackingLocation ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 shadow-sm'}`}
-                                             title="Gambar rute garis di peta aplikasi"
+                                             title="Gambar titik-titik rute jalan kaki di peta"
                                           >
                                              {isCalculatingRoute ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <RouteIcon className="w-3.5 h-3.5"/>} 
                                              Rute Peta
@@ -1389,7 +1382,7 @@ export default function App() {
                                              onClick={handleOpenGoogleMapsRoute} 
                                              disabled={!isTrackingLocation}
                                              className={`w-full py-2.5 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors ${!isTrackingLocation ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'}`}
-                                             title="Buka rute akurat via Google Maps"
+                                             title="Buka rute akurat via aplikasi Google Maps"
                                           >
                                              <ExternalLink className="w-3.5 h-3.5"/> 
                                              Google Maps
@@ -1975,7 +1968,7 @@ export default function App() {
                </div>
             )}
 
-            {/* MODAL EDIT DATA (TERBUKA UNTUK ADMIN DAN PETUGAS) */}
+            {/* MODAL EDIT DATA */}
             {editModal.isOpen && editModal.data && (
               <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
                 <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
