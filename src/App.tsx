@@ -1730,29 +1730,88 @@ export default function App() {
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                      <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider">Total Entri</p>
+                      {/* ── TOTAL ENTRI (reset filter) ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard('Semua')}
+                        title="Tampilkan semua data"
+                        className={`bg-blue-50 p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'Semua' ? 'border-blue-500 ring-2 ring-blue-400 bg-blue-100' : 'border-blue-200'}`}>
+                         <p className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'Semua' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>}
+                           Total Entri
+                         </p>
                          <p className="text-3xl font-black text-blue-800 mt-1">{masterDataStats.total}</p>
+                         <p className="text-[9px] text-blue-400 mt-1">Klik untuk tampilkan semua</p>
                       </div>
-                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">PKL Umum</p>
+
+                      {/* ── PKL UMUM ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'PKL' ? 'Semua' : 'PKL')}
+                        title="Filter PKL Umum"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'PKL' ? 'border-slate-600 ring-2 ring-slate-500 bg-slate-100' : 'bg-white border-slate-200'}`}>
+                         <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'PKL' && <span className="w-1.5 h-1.5 rounded-full bg-slate-600 inline-block"></span>}
+                           PKL Umum
+                         </p>
                          <p className="text-3xl font-black text-slate-800 mt-1">{masterDataStats.kategori['PKL']}</p>
+                         <p className="text-[9px] text-slate-400 mt-1">Klik untuk filter</p>
                       </div>
-                      <div className="bg-purple-50 p-4 rounded-xl border border-purple-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider">Lapak Loksem</p>
+
+                      {/* ── LAPAK LOKSEM ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'LOKSEM' ? 'Semua' : 'LOKSEM')}
+                        title="Filter Lapak Loksem"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'LOKSEM' ? 'border-purple-500 ring-2 ring-purple-400 bg-purple-100' : 'bg-purple-50 border-purple-200'}`}>
+                         <p className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'LOKSEM' && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block"></span>}
+                           Lapak Loksem
+                         </p>
                          <p className="text-3xl font-black text-purple-800 mt-1">{masterDataStats.kategori['LOKSEM']}</p>
+                         <p className="text-[9px] text-purple-400 mt-1">Klik untuk filter</p>
                       </div>
-                      <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-orange-600 uppercase tracking-wider">Sewa Tikar</p>
+
+                      {/* ── SEWA TIKAR ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'TIKAR' ? 'Semua' : 'TIKAR')}
+                        title="Filter Sewa Tikar"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'TIKAR' ? 'border-orange-500 ring-2 ring-orange-400 bg-orange-100' : 'bg-orange-50 border-orange-200'}`}>
+                         <p className="text-[10px] font-extrabold text-orange-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'TIKAR' && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>}
+                           Sewa Tikar
+                         </p>
                          <p className="text-3xl font-black text-orange-800 mt-1">{masterDataStats.kategori['TIKAR']}</p>
+                         <p className="text-[9px] text-orange-400 mt-1">Klik untuk filter</p>
                       </div>
-                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider">Juru Foto</p>
+
+                      {/* ── JURU FOTO ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'JURU FOTO' ? 'Semua' : 'JURU FOTO')}
+                        title="Filter Juru Foto"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'JURU FOTO' ? 'border-indigo-500 ring-2 ring-indigo-400 bg-indigo-100' : 'bg-indigo-50 border-indigo-200'}`}>
+                         <p className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'JURU FOTO' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>}
+                           Juru Foto
+                         </p>
                          <p className="text-3xl font-black text-indigo-800 mt-1">{masterDataStats.kategori['JURU FOTO']}</p>
+                         <p className="text-[9px] text-indigo-400 mt-1">Klik untuk filter</p>
                       </div>
-                      <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wider">Tagihan Listrik</p>
+
+                      {/* ── TAGIHAN LISTRIK ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'LISTRIK' ? 'Semua' : 'LISTRIK')}
+                        title="Filter Tagihan Listrik"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'LISTRIK' ? 'border-amber-500 ring-2 ring-amber-400 bg-amber-100' : 'bg-amber-50 border-amber-200'}`}>
+                         <p className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'LISTRIK' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>}
+                           Tagihan Listrik
+                         </p>
                          <p className="text-3xl font-black text-amber-800 mt-1">{masterDataStats.kategori['LISTRIK']}</p>
+                         <p className="text-[9px] text-amber-400 mt-1">Klik untuk filter</p>
                       </div>
                     </div>
 
