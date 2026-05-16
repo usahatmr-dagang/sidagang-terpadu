@@ -1492,8 +1492,8 @@ export default function App() {
 
                 {/* 2. KONTEN PETA (DENGAN ANIMASI & RUTE) */}
                 {activeMenu === 'peta' && (
-                  <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 h-[calc(100vh-6.5rem)] lg:h-[calc(100vh-5rem)] animate-in fade-in relative">
-                    <div className="w-full h-[40%] lg:h-full lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
+                  <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-5rem)] animate-in fade-in relative">
+                    <div className="w-full h-[50vh] lg:h-full lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
                        <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 flex justify-between items-start z-[1000] pointer-events-none gap-2">
                           <div className="bg-white/90 backdrop-blur px-3 py-2 sm:px-4 sm:py-3 rounded-xl shadow-lg border border-slate-200 pointer-events-auto max-w-[60%] sm:max-w-none">
                             <h3 className="font-extrabold flex items-center gap-1.5 text-slate-800 text-xs sm:text-sm"><MapIcon className="w-4 h-4 text-blue-600 shrink-0"/> <span className="truncate">Satelit TM Ragunan</span></h3>
@@ -1637,7 +1637,7 @@ export default function App() {
                         )}
                      </div>
 
-                     <div className="w-full flex-1 lg:h-full lg:w-[380px] bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden shrink-0 z-10 relative">
+                     <div className="w-full lg:h-full lg:w-[380px] bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden shrink-0 z-10 relative">
                         <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 shrink-0">
                            <label className="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1.5 sm:mb-2 uppercase tracking-widest"><Filter className="w-3.5 h-3.5 inline mb-0.5"/> Filter Zonasi Peta</label>
                            <select value={selectedZone} onChange={e => { setSelectedZone(e.target.value); setSelectedMapMerchant(null); }} className="w-full px-3 py-2 sm:py-2.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm font-bold text-slate-700 shadow-sm outline-none cursor-pointer focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
