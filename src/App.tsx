@@ -1492,7 +1492,7 @@ export default function App() {
 
                 {/* 2. KONTEN PETA (DENGAN ANIMASI & RUTE) */}
                 {activeMenu === 'peta' && (
-                  <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 h-[calc(100vh-6.5rem)] lg:h-[calc(100vh-8rem)] animate-in fade-in relative">
+                  <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 h-[calc(100vh-6.5rem)] lg:h-[calc(100vh-5rem)] animate-in fade-in relative">
                     <div className="w-full h-[40%] lg:h-auto lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
                        <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 flex justify-between items-start z-[1000] pointer-events-none gap-2">
                           <div className="bg-white/90 backdrop-blur px-3 py-2 sm:px-4 sm:py-3 rounded-xl shadow-lg border border-slate-200 pointer-events-auto max-w-[60%] sm:max-w-none">
@@ -1689,7 +1689,7 @@ export default function App() {
                                 {jenisMapSorted.length > 0 && (
                                   <div>
                                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Jenis Usaha di Area Ini</p>
-                                    <div className="flex flex-wrap gap-1">
+                                    <div className="flex flex-wrap gap-1 max-h-[85px] overflow-y-auto pr-1">
                                       {jenisMapSorted.map(([jenis, count]) => (
                                         <button
                                           key={jenis}
@@ -1725,8 +1725,8 @@ export default function App() {
                                 )}
                               </div>
 
-                             <div className="p-4 sm:p-5 bg-slate-800 text-white shrink-0">
-                               <div className="flex justify-between items-start mb-3 sm:mb-4">
+                             <div className="p-3 sm:p-4 bg-slate-800 text-white shrink-0">
+                               <div className="flex justify-between items-start mb-2 sm:mb-3">
                                  <div>
                                    <h4 className="text-[9px] sm:text-[10px] font-extrabold text-blue-400 uppercase tracking-widest mb-0.5 sm:mb-1">Rangkuman Area</h4>
                                    <h3 className="text-base sm:text-lg font-black tracking-tight leading-none">{mapZonesData.find(z => z.id === selectedZone)?.name || selectedZone}</h3>
@@ -1736,12 +1736,12 @@ export default function App() {
                                    <p className="text-base sm:text-lg font-bold">{merchantsInZone.length}</p>
                                  </div>
                                </div>
-                               <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-1 sm:mt-2">
-                                 <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-2 sm:p-2.5">
+                               <div className="grid grid-cols-2 gap-2 mt-1">
+                                 <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-2">
                                    <p className="text-[8px] sm:text-[9px] font-bold text-red-400 uppercase">Perlu Ditagih</p>
                                    <p className="text-sm sm:text-base font-bold text-red-300">{nunggakCount} <span className="text-[9px] sm:text-[10px]">Orang</span></p>
                                  </div>
-                                 <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-2 sm:p-2.5">
+                                 <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-2">
                                    <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">Potensi Kas</p>
                                    <p className="text-[11px] sm:text-xs font-bold text-white mt-0.5 sm:mt-1">{formatRp(totalUangNunggak)}</p>
                                  </div>
