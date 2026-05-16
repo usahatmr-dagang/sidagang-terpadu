@@ -161,6 +161,15 @@ export default function App() {
           setUserRole(determinedRole);
           if (determinedRole === 'admin') setActiveMenu('dashboard'); else setActiveMenu('peta');
 
+          // ── Muat data SKB dari Firestore (agar tidak hilang saat refresh) ──
+          try {
+            const sdRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'specialDates');
+            const sdSnap = await getDoc(sdRef);
+            if (sdSnap.exists() && sdSnap.data().data) {
+              setSpecialDates(prev => ({ ...prev, ...sdSnap.data().data }));
+            }
+          } catch (e) { /* abaikan jika gagal */ }
+
         } catch (error) { showToast("Terjadi kesalahan saat memuat hak akses.", "error"); }
       } else {
         setAppUser(null); setUserRole(null);
@@ -595,81 +604,196 @@ export default function App() {
   const handleSyncHolidays = async () => {
     if (userRole !== 'admin') return;
     setIsSyncing(true);
-    try {
-      let data = null;
-      
-      let response = await fetch(`https://dayoffapi.vercel.app/api?year=${calYear}`).catch(() => null);
-      if (response && response.ok) data = await response.json();
 
-      if (!data || data.length === 0) {
-        response = await fetch(`https://api-harilibur.vercel.app/api?year=${calYear}`).catch(() => null);
-        if (response && response.ok) data = await response.json();
+    // ── Helper: normalisasi tanggal ke format YYYY-MM-DD ──
+    const normalizeDate = (val) => {
+      if (!val) return null;
+      const s = String(val).trim();
+      // Sudah YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      // DD-MM-YYYY atau DD/MM/YYYY
+      const m1 = s.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+      if (m1) return `${m1[3]}-${m1[2]}-${m1[1]}`;
+      // Timestamp angka (Excel / epoch)
+      const num = Number(s);
+      if (!isNaN(num) && num > 40000) {
+        const d = new Date(Math.round((num - 25569) * 86400 * 1000));
+        return d.toISOString().split('T')[0];
       }
+      return null;
+    };
 
-      if (data && Array.isArray(data) && data.length > 0) {
-         const newSpecialDates = { ...specialDates };
-         let added = 0;
-         
-         data.forEach(item => { 
-           const tgl = item.tanggal || item.holiday_date;
-           const ket = item.keterangan || item.holiday_name;
-           const isCuti = item.is_cuti === true || String(ket).toLowerCase().includes('cuti bersama');
-           
-           if (tgl && ket && String(tgl).startsWith(String(calYear))) { 
-               const finalName = isCuti ? `Cuti Bersama: ${ket.replace(/Cuti Bersama/i, '').trim()}` : ket;
-               newSpecialDates[tgl] = { type: 'LIBUR', name: finalName }; 
-               added++; 
-           } 
-         });
-         
-         if (added > 0) {
-             setSpecialDates(newSpecialDates); 
-             const today = new Date();
-             const tzOffset = today.getTimezoneOffset() * 60000;
-             const localISOTime = (new Date(today - tzOffset)).toISOString().slice(0, -1);
-             const todayStr = localISOTime.split('T')[0];
-             
-             if (newSpecialDates[todayStr]) {
-                 setTimeout(() => {
-                     showToast(`Pemberitahuan SKB: Hari ini (${todayStr}) tercatat sebagai ${newSpecialDates[todayStr].name}. Tarif tagihan disesuaikan.`, "info");
-                 }, 4500);
-             }
-
-             showToast(`Sinkronisasi sukses! ${added} Hari Libur & Cuti Bersama dari SKB ditarik.`, "success");
-         } else {
-             throw new Error('Data API tidak memuat tahun yang dipilih.');
-         }
-      } else {
-         throw new Error('Semua jalur API kosong/gagal.');
+    // ── Daftar sumber API (urutan prioritas) ──
+    const apiSources = [
+      {
+        name: 'Nager.Date (Global)',
+        url: `https://date.nager.at/api/v3/PublicHolidays/${calYear}/ID`,
+        parse: (data) => data.map(item => ({
+          tanggal: item.date,
+          keterangan: item.localName || item.name,
+          isCuti: false
+        }))
+      },
+      {
+        name: 'DayOff API',
+        url: `https://dayoffapi.vercel.app/api?year=${calYear}`,
+        parse: (data) => data.map(item => ({
+          tanggal: item.tanggal,
+          keterangan: item.keterangan,
+          isCuti: item.is_cuti === true
+        }))
+      },
+      {
+        name: 'HariLibur API',
+        url: `https://api-harilibur.vercel.app/api?year=${calYear}`,
+        parse: (data) => data.map(item => ({
+          tanggal: item.holiday_date,
+          keterangan: item.holiday_name,
+          isCuti: String(item.holiday_name || '').toLowerCase().includes('cuti')
+        }))
       }
-    } catch (error) { 
-      const fallback2026 = {
-         "2026-01-01": { type: "LIBUR", name: "Tahun Baru Masehi" },
-         "2026-02-17": { type: "LIBUR", name: "Isra Mikraj" },
-         "2026-03-03": { type: "LIBUR", name: "Hari Raya Nyepi" },
-         "2026-03-20": { type: "LIBUR", name: "Cuti Bersama Idul Fitri" },
-         "2026-03-21": { type: "LIBUR", name: "Idul Fitri" },
-         "2026-04-03": { type: "LIBUR", name: "Wafat Isa Al Masih" },
-         "2026-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
-         "2026-05-14": { type: "LIBUR", name: "Kenaikan Isa Al Masih" },
-         "2026-05-15": { type: "LIBUR", name: "Cuti Bersama Kenaikan Isa Al Masih" }, 
-         "2026-05-26": { type: "LIBUR", name: "Hari Raya Waisak" },
-         "2026-05-27": { type: "LIBUR", name: "Idul Adha" },
-         "2026-07-16": { type: "LIBUR", name: "Tahun Baru Islam" },
-         "2026-08-17": { type: "LIBUR", name: "Hari Kemerdekaan RI" },
-         "2026-09-27": { type: "LIBUR", name: "Maulid Nabi Muhammad" },
-         "2026-12-25": { type: "LIBUR", name: "Hari Raya Natal" }
-      };
-      const merged = {...specialDates, ...fallback2026};
-      setSpecialDates(merged);
+    ];
 
-      const todayStr = new Date().toISOString().split('T')[0];
-      if (merged[todayStr]) {
-          setTimeout(() => { showToast(`Info: Hari ini (${todayStr}) adalah ${merged[todayStr].name}`, "info"); }, 4500);
+    let syncedData = null;
+    let sourceName = '';
+
+    for (const source of apiSources) {
+      try {
+        showToast(`Mencoba ${source.name}...`, 'info');
+        const res = await fetch(source.url, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const raw = await res.json();
+        if (!Array.isArray(raw) || raw.length === 0) throw new Error('Data kosong');
+        syncedData = source.parse(raw);
+        sourceName = source.name;
+        break;
+      } catch (err) {
+        console.warn(`[SKB] ${source.name} gagal:`, err.message);
       }
-
-      showToast(`API Publik bermasalah. Menggunakan Data SKB Offline ${calYear}.`, "success"); 
     }
+
+    // ── Terapkan hasil sinkronisasi ──
+    const applyData = async (items, isOffline = false) => {
+      const newSpecialDates = { ...specialDates };
+      let added = 0;
+
+      items.forEach(item => {
+        const tgl = normalizeDate(item.tanggal);
+        const ket = String(item.keterangan || '').trim();
+        if (!tgl || !ket) return;
+        if (!String(tgl).startsWith(String(calYear))) return;
+
+        const isCuti = item.isCuti || ket.toLowerCase().includes('cuti bersama');
+        const finalName = isCuti
+          ? `Cuti Bersama: ${ket.replace(/cuti bersama/i, '').trim()}`
+          : ket;
+
+        newSpecialDates[tgl] = { type: 'LIBUR', name: finalName };
+        added++;
+      });
+
+      if (added === 0) {
+        showToast(`Tidak ada data SKB tahun ${calYear} yang berhasil diterapkan.`, 'error');
+        setIsSyncing(false);
+        return;
+      }
+
+      setSpecialDates(newSpecialDates);
+
+      // ── Simpan ke Firestore agar permanen ──
+      try {
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'specialDates'),
+          { data: newSpecialDates, lastSync: new Date().toISOString(), year: calYear }
+        );
+      } catch (fbErr) {
+        console.warn('[SKB] Gagal simpan ke Firestore:', fbErr.message);
+      }
+
+      // ── Cek apakah hari ini libur ──
+      const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD lokal
+      if (newSpecialDates[todayStr]) {
+        setTimeout(() => {
+          showToast(`⚠️ Info SKB: Hari ini (${todayStr}) adalah ${newSpecialDates[todayStr].name}. Tarif disesuaikan.`, 'info');
+        }, 3000);
+      }
+
+      const prefix = isOffline ? `⚠️ API offline. Data SKB bawaan ${calYear} dimuat.` : `✅ Sinkronisasi SKB sukses via ${sourceName}!`;
+      showToast(`${prefix} ${added} tanggal special diterapkan.`, 'success');
+    };
+
+    if (syncedData && syncedData.length > 0) {
+      await applyData(syncedData, false);
+    } else {
+      // ── Fallback: generate data SKB berdasarkan tahun ──
+      showToast(`Semua API gagal. Menggunakan data SKB offline tahun ${calYear}.`, 'info');
+
+      const yr = calYear;
+      const fallbackByYear = {
+        2025: [
+          { tanggal: `${yr}-01-01`, keterangan: 'Tahun Baru Masehi' },
+          { tanggal: `${yr}-01-27`, keterangan: 'Isra Mikraj Nabi Muhammad' },
+          { tanggal: `${yr}-01-28`, keterangan: 'Cuti Bersama Isra Mikraj', isCuti: true },
+          { tanggal: `${yr}-01-29`, keterangan: 'Tahun Baru Imlek' },
+          { tanggal: `${yr}-03-29`, keterangan: 'Hari Suci Nyepi' },
+          { tanggal: `${yr}-03-31`, keterangan: 'Idul Fitri 1446 H' },
+          { tanggal: `${yr}-04-01`, keterangan: 'Idul Fitri 1446 H' },
+          { tanggal: `${yr}-04-02`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-04-03`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-04-04`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-04-18`, keterangan: 'Wafat Isa Al Masih' },
+          { tanggal: `${yr}-05-01`, keterangan: 'Hari Buruh Internasional' },
+          { tanggal: `${yr}-05-12`, keterangan: 'Hari Raya Waisak' },
+          { tanggal: `${yr}-05-29`, keterangan: 'Kenaikan Isa Al Masih' },
+          { tanggal: `${yr}-06-01`, keterangan: 'Hari Lahir Pancasila' },
+          { tanggal: `${yr}-06-06`, keterangan: 'Idul Adha 1446 H' },
+          { tanggal: `${yr}-06-27`, keterangan: 'Tahun Baru Islam 1447 H' },
+          { tanggal: `${yr}-08-17`, keterangan: 'Hari Kemerdekaan RI' },
+          { tanggal: `${yr}-09-05`, keterangan: 'Maulid Nabi Muhammad SAW' },
+          { tanggal: `${yr}-12-25`, keterangan: 'Hari Raya Natal' },
+          { tanggal: `${yr}-12-26`, keterangan: 'Cuti Bersama Natal', isCuti: true },
+        ],
+        2026: [
+          { tanggal: `${yr}-01-01`, keterangan: 'Tahun Baru Masehi' },
+          { tanggal: `${yr}-02-17`, keterangan: 'Isra Mikraj Nabi Muhammad' },
+          { tanggal: `${yr}-02-17`, keterangan: 'Tahun Baru Imlek' },
+          { tanggal: `${yr}-03-19`, keterangan: 'Hari Suci Nyepi' },
+          { tanggal: `${yr}-03-20`, keterangan: 'Idul Fitri 1447 H' },
+          { tanggal: `${yr}-03-21`, keterangan: 'Idul Fitri 1447 H' },
+          { tanggal: `${yr}-03-23`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-03-24`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-04-03`, keterangan: 'Wafat Isa Al Masih' },
+          { tanggal: `${yr}-05-01`, keterangan: 'Hari Buruh Internasional' },
+          { tanggal: `${yr}-05-14`, keterangan: 'Kenaikan Isa Al Masih' },
+          { tanggal: `${yr}-05-26`, keterangan: 'Hari Raya Waisak' },
+          { tanggal: `${yr}-05-27`, keterangan: 'Idul Adha 1447 H' },
+          { tanggal: `${yr}-07-16`, keterangan: 'Tahun Baru Islam 1448 H' },
+          { tanggal: `${yr}-08-17`, keterangan: 'Hari Kemerdekaan RI' },
+          { tanggal: `${yr}-09-27`, keterangan: 'Maulid Nabi Muhammad SAW' },
+          { tanggal: `${yr}-12-25`, keterangan: 'Hari Raya Natal' },
+        ],
+        2027: [
+          { tanggal: `${yr}-01-01`, keterangan: 'Tahun Baru Masehi' },
+          { tanggal: `${yr}-02-06`, keterangan: 'Isra Mikraj Nabi Muhammad' },
+          { tanggal: `${yr}-02-16`, keterangan: 'Tahun Baru Imlek 2578' },
+          { tanggal: `${yr}-03-09`, keterangan: 'Idul Fitri 1448 H' },
+          { tanggal: `${yr}-03-10`, keterangan: 'Idul Fitri 1448 H' },
+          { tanggal: `${yr}-03-26`, keterangan: 'Hari Suci Nyepi' },
+          { tanggal: `${yr}-05-01`, keterangan: 'Hari Buruh Internasional' },
+          { tanggal: `${yr}-05-06`, keterangan: 'Kenaikan Isa Al Masih' },
+          { tanggal: `${yr}-05-16`, keterangan: 'Idul Adha 1448 H' },
+          { tanggal: `${yr}-05-24`, keterangan: 'Hari Raya Waisak' },
+          { tanggal: `${yr}-06-06`, keterangan: 'Tahun Baru Islam 1449 H' },
+          { tanggal: `${yr}-08-17`, keterangan: 'Hari Kemerdekaan RI' },
+          { tanggal: `${yr}-09-16`, keterangan: 'Maulid Nabi Muhammad SAW' },
+          { tanggal: `${yr}-12-25`, keterangan: 'Hari Raya Natal' },
+        ]
+      };
+
+      const fallbackItems = fallbackByYear[yr] || fallbackByYear[2026];
+      await applyData(fallbackItems, true);
+    }
+
     setIsSyncing(false);
   };
 
