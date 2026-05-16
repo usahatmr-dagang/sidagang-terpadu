@@ -685,10 +685,11 @@ export default function App() {
 
         const isCuti = item.isCuti || ket.toLowerCase().includes('cuti bersama');
         const finalName = isCuti
-          ? `Cuti Bersama: ${ket.replace(/cuti bersama/i, '').trim()}`
+          ? `Cuti Bersama: ${ket.replace(/cuti bersama/gi, '').trim() || ket}`
           : ket;
 
-        newSpecialDates[tgl] = { type: 'LIBUR', name: finalName };
+        // CUTI BERSAMA punya tipe sendiri agar bisa dibedakan warnanya di kalender
+        newSpecialDates[tgl] = { type: isCuti ? 'CUTI' : 'LIBUR', name: finalName };
         added++;
       });
 
@@ -731,62 +732,89 @@ export default function App() {
       const yr = calYear;
       const fallbackByYear = {
         2025: [
-          { tanggal: `${yr}-01-01`, keterangan: 'Tahun Baru Masehi' },
-          { tanggal: `${yr}-01-27`, keterangan: 'Isra Mikraj Nabi Muhammad' },
-          { tanggal: `${yr}-01-28`, keterangan: 'Cuti Bersama Isra Mikraj', isCuti: true },
-          { tanggal: `${yr}-01-29`, keterangan: 'Tahun Baru Imlek' },
-          { tanggal: `${yr}-03-29`, keterangan: 'Hari Suci Nyepi' },
+          // ── HARI LIBUR NASIONAL 2025 ──
+          { tanggal: `${yr}-01-01`, keterangan: 'Tahun Baru Masehi 2025' },
+          { tanggal: `${yr}-01-27`, keterangan: 'Isra Mikraj Nabi Muhammad SAW' },
+          { tanggal: `${yr}-01-29`, keterangan: 'Tahun Baru Imlek 2576' },
+          { tanggal: `${yr}-03-29`, keterangan: 'Hari Suci Nyepi (Tahun Baru Saka 1947)' },
           { tanggal: `${yr}-03-31`, keterangan: 'Idul Fitri 1446 H' },
-          { tanggal: `${yr}-04-01`, keterangan: 'Idul Fitri 1446 H' },
-          { tanggal: `${yr}-04-02`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
-          { tanggal: `${yr}-04-03`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
-          { tanggal: `${yr}-04-04`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-04-01`, keterangan: 'Idul Fitri 1446 H (Hari Kedua)' },
           { tanggal: `${yr}-04-18`, keterangan: 'Wafat Isa Al Masih' },
+          { tanggal: `${yr}-04-20`, keterangan: 'Paskah' },
           { tanggal: `${yr}-05-01`, keterangan: 'Hari Buruh Internasional' },
-          { tanggal: `${yr}-05-12`, keterangan: 'Hari Raya Waisak' },
+          { tanggal: `${yr}-05-12`, keterangan: 'Hari Raya Waisak 2569 BE' },
           { tanggal: `${yr}-05-29`, keterangan: 'Kenaikan Isa Al Masih' },
           { tanggal: `${yr}-06-01`, keterangan: 'Hari Lahir Pancasila' },
           { tanggal: `${yr}-06-06`, keterangan: 'Idul Adha 1446 H' },
           { tanggal: `${yr}-06-27`, keterangan: 'Tahun Baru Islam 1447 H' },
-          { tanggal: `${yr}-08-17`, keterangan: 'Hari Kemerdekaan RI' },
+          { tanggal: `${yr}-08-17`, keterangan: 'Hari Kemerdekaan Republik Indonesia' },
           { tanggal: `${yr}-09-05`, keterangan: 'Maulid Nabi Muhammad SAW' },
           { tanggal: `${yr}-12-25`, keterangan: 'Hari Raya Natal' },
+          // ── CUTI BERSAMA 2025 (SKB 3 Menteri) ──
+          { tanggal: `${yr}-01-28`, keterangan: 'Cuti Bersama Isra Mikraj', isCuti: true },
+          { tanggal: `${yr}-03-28`, keterangan: 'Cuti Bersama Nyepi', isCuti: true },
+          { tanggal: `${yr}-04-02`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-04-03`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-04-04`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-04-07`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-05-13`, keterangan: 'Cuti Bersama Waisak', isCuti: true },
           { tanggal: `${yr}-12-26`, keterangan: 'Cuti Bersama Natal', isCuti: true },
         ],
         2026: [
-          { tanggal: `${yr}-01-01`, keterangan: 'Tahun Baru Masehi' },
-          { tanggal: `${yr}-02-17`, keterangan: 'Isra Mikraj Nabi Muhammad' },
-          { tanggal: `${yr}-02-17`, keterangan: 'Tahun Baru Imlek' },
-          { tanggal: `${yr}-03-19`, keterangan: 'Hari Suci Nyepi' },
+          // ── HARI LIBUR NASIONAL 2026 ──
+          { tanggal: `${yr}-01-01`, keterangan: 'Tahun Baru Masehi 2026' },
+          { tanggal: `${yr}-02-17`, keterangan: 'Tahun Baru Imlek 2577' },
+          { tanggal: `${yr}-02-18`, keterangan: 'Isra Mikraj Nabi Muhammad SAW 1447 H' },
+          { tanggal: `${yr}-03-19`, keterangan: 'Hari Suci Nyepi (Tahun Baru Saka 1948)' },
           { tanggal: `${yr}-03-20`, keterangan: 'Idul Fitri 1447 H' },
-          { tanggal: `${yr}-03-21`, keterangan: 'Idul Fitri 1447 H' },
-          { tanggal: `${yr}-03-23`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
-          { tanggal: `${yr}-03-24`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-03-21`, keterangan: 'Idul Fitri 1447 H (Hari Kedua)' },
           { tanggal: `${yr}-04-03`, keterangan: 'Wafat Isa Al Masih' },
+          { tanggal: `${yr}-04-05`, keterangan: 'Paskah' },
           { tanggal: `${yr}-05-01`, keterangan: 'Hari Buruh Internasional' },
           { tanggal: `${yr}-05-14`, keterangan: 'Kenaikan Isa Al Masih' },
-          { tanggal: `${yr}-05-26`, keterangan: 'Hari Raya Waisak' },
+          { tanggal: `${yr}-05-26`, keterangan: 'Hari Raya Waisak 2570 BE' },
           { tanggal: `${yr}-05-27`, keterangan: 'Idul Adha 1447 H' },
+          { tanggal: `${yr}-06-01`, keterangan: 'Hari Lahir Pancasila' },
           { tanggal: `${yr}-07-16`, keterangan: 'Tahun Baru Islam 1448 H' },
-          { tanggal: `${yr}-08-17`, keterangan: 'Hari Kemerdekaan RI' },
-          { tanggal: `${yr}-09-27`, keterangan: 'Maulid Nabi Muhammad SAW' },
+          { tanggal: `${yr}-08-17`, keterangan: 'Hari Kemerdekaan Republik Indonesia' },
+          { tanggal: `${yr}-09-27`, keterangan: 'Maulid Nabi Muhammad SAW 1448 H' },
           { tanggal: `${yr}-12-25`, keterangan: 'Hari Raya Natal' },
+          // ── CUTI BERSAMA 2026 (SKB 3 Menteri) ──
+          { tanggal: `${yr}-03-18`, keterangan: 'Cuti Bersama Nyepi', isCuti: true },
+          { tanggal: `${yr}-03-23`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-03-24`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-03-25`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-03-26`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-05-15`, keterangan: 'Cuti Bersama Kenaikan Isa Al Masih', isCuti: true },
+          { tanggal: `${yr}-12-26`, keterangan: 'Cuti Bersama Natal', isCuti: true },
         ],
         2027: [
-          { tanggal: `${yr}-01-01`, keterangan: 'Tahun Baru Masehi' },
-          { tanggal: `${yr}-02-06`, keterangan: 'Isra Mikraj Nabi Muhammad' },
+          // ── HARI LIBUR NASIONAL 2027 ──
+          { tanggal: `${yr}-01-01`, keterangan: 'Tahun Baru Masehi 2027' },
+          { tanggal: `${yr}-02-06`, keterangan: 'Isra Mikraj Nabi Muhammad SAW 1448 H' },
           { tanggal: `${yr}-02-16`, keterangan: 'Tahun Baru Imlek 2578' },
           { tanggal: `${yr}-03-09`, keterangan: 'Idul Fitri 1448 H' },
-          { tanggal: `${yr}-03-10`, keterangan: 'Idul Fitri 1448 H' },
-          { tanggal: `${yr}-03-26`, keterangan: 'Hari Suci Nyepi' },
+          { tanggal: `${yr}-03-10`, keterangan: 'Idul Fitri 1448 H (Hari Kedua)' },
+          { tanggal: `${yr}-03-26`, keterangan: 'Hari Suci Nyepi (Tahun Baru Saka 1949)' },
+          { tanggal: `${yr}-04-02`, keterangan: 'Wafat Isa Al Masih' },
+          { tanggal: `${yr}-04-04`, keterangan: 'Paskah' },
           { tanggal: `${yr}-05-01`, keterangan: 'Hari Buruh Internasional' },
           { tanggal: `${yr}-05-06`, keterangan: 'Kenaikan Isa Al Masih' },
-          { tanggal: `${yr}-05-16`, keterangan: 'Idul Adha 1448 H' },
-          { tanggal: `${yr}-05-24`, keterangan: 'Hari Raya Waisak' },
-          { tanggal: `${yr}-06-06`, keterangan: 'Tahun Baru Islam 1449 H' },
-          { tanggal: `${yr}-08-17`, keterangan: 'Hari Kemerdekaan RI' },
-          { tanggal: `${yr}-09-16`, keterangan: 'Maulid Nabi Muhammad SAW' },
+          { tanggal: `${yr}-05-15`, keterangan: 'Idul Adha 1448 H' },
+          { tanggal: `${yr}-05-24`, keterangan: 'Hari Raya Waisak 2571 BE' },
+          { tanggal: `${yr}-06-01`, keterangan: 'Hari Lahir Pancasila' },
+          { tanggal: `${yr}-07-05`, keterangan: 'Tahun Baru Islam 1449 H' },
+          { tanggal: `${yr}-08-17`, keterangan: 'Hari Kemerdekaan Republik Indonesia' },
+          { tanggal: `${yr}-09-16`, keterangan: 'Maulid Nabi Muhammad SAW 1449 H' },
           { tanggal: `${yr}-12-25`, keterangan: 'Hari Raya Natal' },
+          // ── CUTI BERSAMA 2027 (SKB 3 Menteri) ──
+          { tanggal: `${yr}-03-08`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-03-11`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-03-12`, keterangan: 'Cuti Bersama Idul Fitri', isCuti: true },
+          { tanggal: `${yr}-03-25`, keterangan: 'Cuti Bersama Nyepi', isCuti: true },
+          { tanggal: `${yr}-05-07`, keterangan: 'Cuti Bersama Kenaikan Isa Al Masih', isCuti: true },
+          { tanggal: `${yr}-12-24`, keterangan: 'Cuti Bersama Natal', isCuti: true },
+          { tanggal: `${yr}-12-26`, keterangan: 'Cuti Bersama Natal', isCuti: true },
         ]
       };
 
@@ -802,7 +830,8 @@ export default function App() {
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(tahun, bulan - 1, i); const dayOfWeek = date.getDay(); const dateStr = `${tahun}-${String(bulan).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
       const statusSpesial = specialDates[dateStr]?.type;
-      if (statusSpesial === 'LIBUR' || statusSpesial === 'PEAK') hariRamai++; else if (statusSpesial === 'TUTUP') tutupOperasional++; else if (statusSpesial === 'BUKA') hariBiasa++; else if (dayOfWeek === 1) tutupOperasional++; else if (dayOfWeek === 0 || dayOfWeek === 6) hariRamai++; else hariBiasa++; 
+      // LIBUR, CUTI BERSAMA, dan PEAK = tarif ramai (Rp 15k)
+      if (statusSpesial === 'LIBUR' || statusSpesial === 'CUTI' || statusSpesial === 'PEAK') hariRamai++; else if (statusSpesial === 'TUTUP') tutupOperasional++; else if (statusSpesial === 'BUKA') hariBiasa++; else if (dayOfWeek === 1) tutupOperasional++; else if (dayOfWeek === 0 || dayOfWeek === 6) hariRamai++; else hariBiasa++; 
     }
     return { hariBiasa, hariRamai, tutupOperasional, tarifHarianFull: (hariBiasa * 10000) + (hariRamai * 15000), tarifHarianNonstop: (hariBiasa * 10000) + (tutupOperasional * 10000) + (hariRamai * 15000), tarifWeekendSaja: (hariRamai * 15000) };
   };
@@ -1824,6 +1853,10 @@ export default function App() {
                               if (isSpecial === 'LIBUR') { 
                                 baseColor = "bg-red-100 border-red-300 text-red-900 shadow-sm ring-1 ring-red-400"; label = specialDates[dateStr]?.name || "Libur Nasional"; 
                                 showPrice = "Rp 15k"; priceColor = "bg-white/50 text-red-700";
+                              }
+                              else if (isSpecial === 'CUTI') {
+                                baseColor = "bg-purple-100 border-purple-300 text-purple-900 shadow-sm ring-1 ring-purple-400"; label = specialDates[dateStr]?.name || "Cuti Bersama"; 
+                                showPrice = "Rp 15k"; priceColor = "bg-white/50 text-purple-700";
                               } 
                               else if (isSpecial === 'PEAK') { 
                                 baseColor = "bg-amber-100 border-amber-300 text-amber-900 shadow-sm ring-1 ring-amber-400"; label = specialDates[dateStr]?.name || "Peak Season"; 
@@ -1866,10 +1899,19 @@ export default function App() {
                         <div className="bg-slate-800 p-6 rounded-xl shadow-md text-white">
                           <h4 className="font-bold mb-4 border-b border-slate-600 pb-2 flex items-center gap-2"><DollarSign className="w-5 h-5"/> Simulasi Tagihan Bulan Ini</h4>
                           <div className="space-y-3 text-sm">
-                            <div className="flex justify-between items-center"><span className="text-slate-300">Hari Biasa (Rp 10k)</span><span className="font-bold">{calStats.hariBiasa} Hari</span></div>
-                            <div className="flex justify-between items-center"><span className="text-amber-300">Peak / Weekend / Cuti (Rp 15k)</span><span className="font-bold">{calStats.hariRamai} Hari</span></div>
-                            <div className="flex justify-between items-center opacity-70"><span className="text-slate-300">Tutup Operasional</span><span className="font-bold">{calStats.tutupOperasional} Hari</span></div>
-                          </div>
+                             <div className="flex justify-between items-center"><span className="text-slate-300">Hari Biasa (Rp 10k)</span><span className="font-bold">{calStats.hariBiasa} Hari</span></div>
+                             <div className="flex justify-between items-center"><span className="text-amber-300">Weekend / Libur / Cuti (Rp 15k)</span><span className="font-bold">{calStats.hariRamai} Hari</span></div>
+                             <div className="flex justify-between items-center opacity-70"><span className="text-slate-300">Tutup Operasional</span><span className="font-bold">{calStats.tutupOperasional} Hari</span></div>
+                           </div>
+                           <div className="mt-4 pt-3 border-t border-slate-700 space-y-1.5 text-xs">
+                             <p className="text-slate-400 font-bold uppercase tracking-wide mb-2">Legenda Warna Kalender</p>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-emerald-300 border border-emerald-400 shrink-0"></span><span className="text-slate-300">Hari Biasa (Rp 10k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-blue-300 border border-blue-400 shrink-0"></span><span className="text-slate-300">Weekend / Sabtu-Minggu (Rp 15k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-red-300 border border-red-400 shrink-0"></span><span className="text-slate-300">Libur Nasional (Rp 15k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-purple-300 border border-purple-400 shrink-0"></span><span className="text-slate-300">Cuti Bersama SKB (Rp 15k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-amber-300 border border-amber-400 shrink-0"></span><span className="text-slate-300">Peak Season (Rp 15k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-slate-300 border border-slate-400 shrink-0"></span><span className="text-slate-300">Senin / Tutup Operasional</span></div>
+                           </div>
                           <div className="mt-6 pt-4 border-t border-slate-600 space-y-4">
                             <div className="bg-emerald-900/50 p-3 rounded-lg border border-emerald-800/50">
                               <p className="text-[11px] text-emerald-200 uppercase font-bold tracking-wide">1. Loksem (Nonstop Buka)</p>
