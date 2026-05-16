@@ -1239,9 +1239,7 @@ export default function App() {
                 <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden p-2 text-slate-400 hover:text-white rounded-lg bg-slate-800 transition-colors"><X className="w-5 h-5" /></button>
               </div>
               <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
-                {userRole === 'admin' && (
-                   <button onClick={() => handleMenuClick('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard className="w-5 h-5" /> Dashboard Tagihan</button>
-                )}
+                    <button onClick={() => handleMenuClick('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard className="w-5 h-5" /> Dashboard Tagihan</button>
                 
                 <button onClick={() => handleMenuClick('peta')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'peta' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><MapIcon className="w-5 h-5" /> Peta Sebaran Real-Time</button>
                 
@@ -1289,8 +1287,8 @@ export default function App() {
 
               <main id="main-scroll-area" className="flex-1 overflow-y-auto p-4 lg:p-8 bg-slate-50/50 scroll-smooth relative">
                 
-                {/* 1. KONTEN DASHBOARD ADMIN */}
-                {userRole === 'admin' && activeMenu === 'dashboard' && (
+                {/* 1. KONTEN DASHBOARD TAGIHAN */}
+                {activeMenu === 'dashboard' && (
                   <div className="max-w-7xl mx-auto space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">
