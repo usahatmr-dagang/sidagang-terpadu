@@ -1,65 +1,24 @@
 // @ts-nocheck
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import AuthScreen from './components/AuthScreen';
 
 // =========================================================================
-// 🔑 MASUKKAN GOOGLE MAPS API KEY ANDA DI SINI (NANTI)
+// 🔑 GOOGLE MAPS API KEY (DARI ENV)
 // =========================================================================
-const GOOGLE_MAPS_API_KEY = ""; // Contoh: "AIzaSyB-xxxxxx..."
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 // =========================================================================
 
-// === ZERO-INSTALL ICONS (MOCK LUCIDE WITH FONTAWESOME) ===
-const Upload = ({className}) => <i className={`fa-solid fa-upload ${className}`}></i>;
-const FileSpreadsheet = ({className}) => <i className={`fa-solid fa-file-excel ${className}`}></i>;
-const CheckCircle = ({className}) => <i className={`fa-solid fa-circle-check ${className}`}></i>;
-const XCircle = ({className}) => <i className={`fa-solid fa-circle-xmark ${className}`}></i>;
-const AlertTriangle = ({className}) => <i className={`fa-solid fa-triangle-exclamation ${className}`}></i>;
-const Search = ({className}) => <i className={`fa-solid fa-magnifying-glass ${className}`}></i>;
-const DollarSign = ({className}) => <i className={`fa-solid fa-dollar-sign ${className}`}></i>;
-const Users = ({className}) => <i className={`fa-solid fa-users ${className}`}></i>;
-const Loader2 = ({className}) => <i className={`fa-solid fa-spinner fa-spin ${className}`}></i>;
-const Database = ({className}) => <i className={`fa-solid fa-database ${className}`}></i>;
-const Download = ({className}) => <i className={`fa-solid fa-download ${className}`}></i>;
-const RefreshCw = ({className}) => <i className={`fa-solid fa-arrows-rotate ${className}`}></i>;
-const FileText = ({className}) => <i className={`fa-solid fa-file-lines ${className}`}></i>;
-const Settings = ({className}) => <i className={`fa-solid fa-gear ${className}`}></i>;
-const Filter = ({className}) => <i className={`fa-solid fa-filter ${className}`}></i>;
-const CalendarIcon = ({className}) => <i className={`fa-solid fa-calendar ${className}`}></i>;
-const CalendarDays = ({className}) => <i className={`fa-solid fa-calendar-days ${className}`}></i>;
-const CloudDownload = ({className}) => <i className={`fa-solid fa-cloud-arrow-down ${className}`}></i>;
-const LayoutDashboard = ({className}) => <i className={`fa-solid fa-chart-pie ${className}`}></i>;
-const AlertOctagon = ({className}) => <i className={`fa-solid fa-circle-exclamation ${className}`}></i>;
-const Wallet = ({className}) => <i className={`fa-solid fa-wallet ${className}`}></i>;
-const PlusCircle = ({className}) => <i className={`fa-solid fa-circle-plus ${className}`}></i>;
-const Eye = ({className}) => <i className={`fa-solid fa-eye ${className}`}></i>;
-const Menu = ({className}) => <i className={`fa-solid fa-bars ${className}`}></i>;
-const X = ({className}) => <i className={`fa-solid fa-xmark ${className}`}></i>;
-const ArrowUpDown = ({className}) => <i className={`fa-solid fa-arrows-up-down ${className}`}></i>;
-const MapPin = ({className}) => <i className={`fa-solid fa-location-dot ${className}`}></i>;
-const Store = ({className}) => <i className={`fa-solid fa-store ${className}`}></i>;
-const CreditCard = ({className}) => <i className={`fa-solid fa-credit-card ${className}`}></i>;
-const Phone = ({className}) => <i className={`fa-solid fa-phone ${className}`}></i>;
-const Home = ({className}) => <i className={`fa-solid fa-house ${className}`}></i>;
-const Contact = ({className}) => <i className={`fa-solid fa-address-book ${className}`}></i>;
-const Pencil = ({className}) => <i className={`fa-solid fa-pen ${className}`}></i>;
-const MapIcon = ({className}) => <i className={`fa-solid fa-map ${className}`}></i>;
-const Navigation = ({className}) => <i className={`fa-solid fa-location-arrow ${className}`}></i>;
-const Crosshair = ({className}) => <i className={`fa-solid fa-crosshairs ${className}`}></i>;
-const MapPinOff = ({className}) => <i className={`fa-solid fa-location-dot opacity-50 ${className}`}></i>;
-const Trash2 = ({className}) => <i className={`fa-solid fa-trash ${className}`}></i>;
-const Camera = ({className}) => <i className={`fa-solid fa-camera ${className}`}></i>;
-const ImageIcon = ({className}) => <i className={`fa-solid fa-image ${className}`}></i>;
-const Info = ({className}) => <i className={`fa-solid fa-circle-info ${className}`}></i>;
-const Lock = ({className}) => <i className={`fa-solid fa-lock ${className}`}></i>;
-const Mail = ({className}) => <i className={`fa-solid fa-envelope ${className}`}></i>;
-const LogOut = ({className}) => <i className={`fa-solid fa-right-from-bracket ${className}`}></i>;
-const ShieldAlert = ({className}) => <i className={`fa-solid fa-shield-halved ${className}`}></i>;
-const UserCog = ({className}) => <i className={`fa-solid fa-users-gear ${className}`}></i>;
-const UserPlus = ({className}) => <i className={`fa-solid fa-user-plus ${className}`}></i>;
-const RouteIcon = ({className}) => <i className={`fa-solid fa-route ${className}`}></i>;
-const PersonWalking = ({className}) => <i className={`fa-solid fa-person-walking ${className}`}></i>;
-const ChevronDown = ({className}) => <i className={`fa-solid fa-chevron-down ${className}`}></i>;
-const ChevronUp = ({className}) => <i className={`fa-solid fa-chevron-up ${className}`}></i>;
-const ExternalLink = ({className}) => <i className={`fa-solid fa-arrow-up-right-from-square ${className}`}></i>;
+// === LUCIDE ICONS ===
+import {
+  Upload, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, Search,
+  DollarSign, Users, Loader2, Database, Download, RefreshCw, FileText,
+  Settings, Filter, Calendar as CalendarIcon, CalendarDays, CloudDownload,
+  LayoutDashboard, AlertOctagon, Wallet, PlusCircle, Eye, Menu, X,
+  ArrowUpDown, MapPin, Store, CreditCard, Phone, Home, Contact, Pencil,
+  Map as MapIcon, Navigation, Crosshair, MapPinOff, Trash2, Camera,
+  Image as ImageIcon, Info, Lock, Mail, LogOut, ShieldAlert, UserCog,
+  UserPlus, Route as RouteIcon, Footprints, ChevronDown, ChevronUp, ExternalLink
+} from 'lucide-react';
 
 // === FIREBASE IMPORTS ===
 import { initializeApp } from 'firebase/app';
@@ -67,13 +26,13 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, si
 import { getFirestore, collection, doc, setDoc, deleteDoc, getDoc, onSnapshot } from 'firebase/firestore';
 
 // === FIREBASE CONFIGURATION ===
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  apiKey: "AIzaSyAs-wRAoCydkFYSvv9h6MrTXcl7o2gisJY",
-  authDomain: "pelaku-usaha.firebaseapp.com",
-  projectId: "pelaku-usaha",
-  storageBucket: "pelaku-usaha.firebasestorage.app",
-  messagingSenderId: "1065543308691",
-  appId: "1:1065543308691:web:46ae59e9dd9f92a3f60466"
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAs-wRAoCydkFYSvv9h6MrTXcl7o2gisJY",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "pelaku-usaha.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "pelaku-usaha",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "pelaku-usaha.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1065543308691",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1065543308691:web:46ae59e9dd9f92a3f60466"
 };
 
 // Inisialisasi App Utama
@@ -87,72 +46,87 @@ const secondaryAuth = getAuth(secondaryApp);
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'ragunan-autodebet-app';
 
-// === DATA SKB 3 MENTERI (HARDCODED & AKURAT) ===
-// Sumber: SKB Menteri Agama, Menaker, dan MenpanRB
-const SKB_DATA = {
-  "2025": {
-    // LIBUR NASIONAL 2025
-    "2025-01-01": { type: "LIBUR", name: "Tahun Baru 2025 Masehi" },
-    "2025-01-27": { type: "LIBUR", name: "Isra Mikraj Nabi Muhammad SAW" },
-    "2025-01-29": { type: "LIBUR", name: "Tahun Baru Imlek 2576 Kongzili" },
-    "2025-03-29": { type: "LIBUR", name: "Hari Suci Nyepi Tahun Baru Saka 1947" },
-    "2025-03-31": { type: "LIBUR", name: "Hari Raya Idul Fitri 1446 H" },
-    "2025-04-01": { type: "LIBUR", name: "Hari Raya Idul Fitri 1446 H" },
-    "2025-04-18": { type: "LIBUR", name: "Wafat Yesus Kristus (Jumat Agung)" },
-    "2025-04-20": { type: "LIBUR", name: "Kebangkitan Yesus Kristus (Paskah)" },
-    "2025-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
-    "2025-05-12": { type: "LIBUR", name: "Hari Raya Waisak 2569 BE" },
-    "2025-05-29": { type: "LIBUR", name: "Kenaikan Yesus Kristus" },
-    "2025-06-01": { type: "LIBUR", name: "Hari Lahir Pancasila" },
-    "2025-06-06": { type: "LIBUR", name: "Hari Raya Idul Adha 1446 H" },
-    "2025-06-27": { type: "LIBUR", name: "Tahun Baru Islam 1447 H" },
-    "2025-08-17": { type: "LIBUR", name: "Hari Kemerdekaan Republik Indonesia" },
-    "2025-09-05": { type: "LIBUR", name: "Maulid Nabi Muhammad SAW" },
-    "2025-12-25": { type: "LIBUR", name: "Hari Raya Natal" },
-    // CUTI BERSAMA 2025
-    "2025-01-28": { type: "LIBUR", name: "Cuti Bersama Tahun Baru Imlek" },
-    "2025-03-28": { type: "LIBUR", name: "Cuti Bersama Nyepi" },
-    "2025-04-02": { type: "LIBUR", name: "Cuti Bersama Idul Fitri" },
-    "2025-04-03": { type: "LIBUR", name: "Cuti Bersama Idul Fitri" },
-    "2025-04-04": { type: "LIBUR", name: "Cuti Bersama Idul Fitri" },
-    "2025-04-07": { type: "LIBUR", name: "Cuti Bersama Idul Fitri" },
-    "2025-05-13": { type: "LIBUR", name: "Cuti Bersama Waisak" },
-    "2025-05-30": { type: "LIBUR", name: "Cuti Bersama Kenaikan Yesus Kristus" },
-    "2025-06-09": { type: "LIBUR", name: "Cuti Bersama Idul Adha" },
-    "2025-12-26": { type: "LIBUR", name: "Cuti Bersama Natal" },
-  },
-  "2026": {
-    // LIBUR NASIONAL 2026
-    "2026-01-01": { type: "LIBUR", name: "Tahun Baru 2026 Masehi" },
-    "2026-01-16": { type: "LIBUR", name: "Isra Mikraj Nabi Muhammad SAW" },
-    "2026-02-17": { type: "LIBUR", name: "Tahun Baru Imlek 2577 Kongzili" },
-    "2026-03-19": { type: "LIBUR", name: "Hari Suci Nyepi Tahun Baru Saka 1948" },
-    "2026-03-21": { type: "LIBUR", name: "Hari Raya Idul Fitri 1447 H" },
-    "2026-03-22": { type: "LIBUR", name: "Hari Raya Idul Fitri 1447 H" },
-    "2026-04-03": { type: "LIBUR", name: "Wafat Yesus Kristus (Jumat Agung)" },
-    "2026-04-05": { type: "LIBUR", name: "Kebangkitan Yesus Kristus (Paskah)" },
-    "2026-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
-    "2026-05-14": { type: "LIBUR", name: "Kenaikan Yesus Kristus" },
-    "2026-05-27": { type: "LIBUR", name: "Hari Raya Idul Adha 1447 H" },
-    "2026-05-31": { type: "LIBUR", name: "Hari Raya Waisak 2570 BE" },
-    "2026-06-01": { type: "LIBUR", name: "Hari Lahir Pancasila" },
-    "2026-06-16": { type: "LIBUR", name: "Tahun Baru Islam 1448 H" },
-    "2026-08-17": { type: "LIBUR", name: "Hari Kemerdekaan Republik Indonesia" },
-    "2026-08-25": { type: "LIBUR", name: "Maulid Nabi Muhammad SAW" },
-    "2026-12-25": { type: "LIBUR", name: "Hari Raya Natal" },
-    // CUTI BERSAMA 2026
-    "2026-02-16": { type: "LIBUR", name: "Cuti Bersama Tahun Baru Imlek" },
-    "2026-03-18": { type: "LIBUR", name: "Cuti Bersama Nyepi" },
-    "2026-03-20": { type: "LIBUR", name: "Cuti Bersama Idul Fitri" },
-    "2026-03-23": { type: "LIBUR", name: "Cuti Bersama Idul Fitri" },
-    "2026-03-24": { type: "LIBUR", name: "Cuti Bersama Idul Fitri" },
-    "2026-05-15": { type: "LIBUR", name: "Cuti Bersama Kenaikan Yesus Kristus" },
-    "2026-05-28": { type: "LIBUR", name: "Cuti Bersama Idul Adha" },
-    "2026-12-24": { type: "LIBUR", name: "Cuti Bersama Natal" },
-  }
+const defaultHolidays: Record<string, { type: string; name: string }> = {
+  // ════ 2025 — HARI LIBUR NASIONAL ════
+  "2025-01-01": { type: "LIBUR", name: "Tahun Baru Masehi 2025" },
+  "2025-01-27": { type: "LIBUR", name: "Isra Mikraj Nabi Muhammad SAW" },
+  "2025-01-29": { type: "LIBUR", name: "Tahun Baru Imlek 2576" },
+  "2025-03-29": { type: "LIBUR", name: "Hari Suci Nyepi" },
+  "2025-03-31": { type: "LIBUR", name: "Idul Fitri 1446 H" },
+  "2025-04-01": { type: "LIBUR", name: "Idul Fitri 1446 H (Hari Kedua)" },
+  "2025-04-18": { type: "LIBUR", name: "Wafat Isa Al Masih" },
+  "2025-04-20": { type: "LIBUR", name: "Paskah" },
+  "2025-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
+  "2025-05-12": { type: "LIBUR", name: "Hari Raya Waisak 2569 BE" },
+  "2025-05-29": { type: "LIBUR", name: "Kenaikan Isa Al Masih" },
+  "2025-06-01": { type: "LIBUR", name: "Hari Lahir Pancasila" },
+  "2025-06-06": { type: "LIBUR", name: "Idul Adha 1446 H" },
+  "2025-06-27": { type: "LIBUR", name: "Tahun Baru Islam 1447 H" },
+  "2025-08-17": { type: "LIBUR", name: "Hari Kemerdekaan Republik Indonesia" },
+  "2025-09-05": { type: "LIBUR", name: "Maulid Nabi Muhammad SAW" },
+  "2025-12-25": { type: "LIBUR", name: "Hari Raya Natal" },
+  // ════ 2025 — CUTI BERSAMA SKB 3 MENTERI ════
+  "2025-01-28": { type: "CUTI", name: "Cuti Bersama: Isra Mikraj" },
+  "2025-03-28": { type: "CUTI", name: "Cuti Bersama: Nyepi" },
+  "2025-04-02": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2025-04-03": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2025-04-04": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2025-04-07": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2025-05-13": { type: "CUTI", name: "Cuti Bersama: Waisak" },
+  "2025-12-26": { type: "CUTI", name: "Cuti Bersama: Natal" },
+  // ════ 2026 — HARI LIBUR NASIONAL ════
+  "2026-01-01": { type: "LIBUR", name: "Tahun Baru Masehi 2026" },
+  "2026-02-17": { type: "LIBUR", name: "Tahun Baru Imlek 2577" },
+  "2026-02-18": { type: "LIBUR", name: "Isra Mikraj Nabi Muhammad SAW 1447 H" },
+  "2026-03-19": { type: "LIBUR", name: "Hari Suci Nyepi (Tahun Baru Saka 1948)" },
+  "2026-03-20": { type: "LIBUR", name: "Idul Fitri 1447 H" },
+  "2026-03-21": { type: "LIBUR", name: "Idul Fitri 1447 H (Hari Kedua)" },
+  "2026-04-03": { type: "LIBUR", name: "Wafat Isa Al Masih" },
+  "2026-04-05": { type: "LIBUR", name: "Paskah" },
+  "2026-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
+  "2026-05-14": { type: "LIBUR", name: "Kenaikan Isa Al Masih" },
+  "2026-05-26": { type: "LIBUR", name: "Hari Raya Waisak 2570 BE" },
+  "2026-05-27": { type: "LIBUR", name: "Idul Adha 1447 H" },
+  "2026-06-01": { type: "LIBUR", name: "Hari Lahir Pancasila" },
+  "2026-07-16": { type: "LIBUR", name: "Tahun Baru Islam 1448 H" },
+  "2026-08-17": { type: "LIBUR", name: "Hari Kemerdekaan Republik Indonesia" },
+  "2026-09-27": { type: "LIBUR", name: "Maulid Nabi Muhammad SAW 1448 H" },
+  "2026-12-25": { type: "LIBUR", name: "Hari Raya Natal" },
+  // ════ 2026 — CUTI BERSAMA SKB 3 MENTERI ════
+  "2026-03-18": { type: "CUTI", name: "Cuti Bersama: Nyepi" },
+  "2026-03-23": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2026-03-24": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2026-03-25": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2026-03-26": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2026-05-15": { type: "CUTI", name: "Cuti Bersama: Kenaikan Isa Al Masih" },
+  "2026-12-26": { type: "CUTI", name: "Cuti Bersama: Natal" },
+  // ════ 2027 — HARI LIBUR NASIONAL ════
+  "2027-01-01": { type: "LIBUR", name: "Tahun Baru Masehi 2027" },
+  "2027-02-06": { type: "LIBUR", name: "Isra Mikraj Nabi Muhammad SAW 1448 H" },
+  "2027-02-16": { type: "LIBUR", name: "Tahun Baru Imlek 2578" },
+  "2027-03-09": { type: "LIBUR", name: "Idul Fitri 1448 H" },
+  "2027-03-10": { type: "LIBUR", name: "Idul Fitri 1448 H (Hari Kedua)" },
+  "2027-03-26": { type: "LIBUR", name: "Hari Suci Nyepi (Tahun Baru Saka 1949)" },
+  "2027-04-02": { type: "LIBUR", name: "Wafat Isa Al Masih" },
+  "2027-04-04": { type: "LIBUR", name: "Paskah" },
+  "2027-05-01": { type: "LIBUR", name: "Hari Buruh Internasional" },
+  "2027-05-06": { type: "LIBUR", name: "Kenaikan Isa Al Masih" },
+  "2027-05-15": { type: "LIBUR", name: "Idul Adha 1448 H" },
+  "2027-05-24": { type: "LIBUR", name: "Hari Raya Waisak 2571 BE" },
+  "2027-06-01": { type: "LIBUR", name: "Hari Lahir Pancasila" },
+  "2027-07-05": { type: "LIBUR", name: "Tahun Baru Islam 1449 H" },
+  "2027-08-17": { type: "LIBUR", name: "Hari Kemerdekaan Republik Indonesia" },
+  "2027-09-16": { type: "LIBUR", name: "Maulid Nabi Muhammad SAW 1449 H" },
+  "2027-12-25": { type: "LIBUR", name: "Hari Raya Natal" },
+  // ════ 2027 — CUTI BERSAMA SKB 3 MENTERI ════
+  "2027-03-08": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2027-03-11": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2027-03-12": { type: "CUTI", name: "Cuti Bersama: Idul Fitri" },
+  "2027-03-25": { type: "CUTI", name: "Cuti Bersama: Nyepi" },
+  "2027-05-07": { type: "CUTI", name: "Cuti Bersama: Kenaikan Isa Al Masih" },
+  "2027-12-24": { type: "CUTI", name: "Cuti Bersama: Natal" },
+  "2027-12-26": { type: "CUTI", name: "Cuti Bersama: Natal" },
 };
-
-const defaultHolidays = SKB_DATA["2026"];
 
 export default function App() {
 
@@ -261,6 +235,15 @@ export default function App() {
           setUserRole(determinedRole);
           if (determinedRole === 'admin') setActiveMenu('dashboard'); else setActiveMenu('peta');
 
+          // ── Muat data SKB dari Firestore (agar tidak hilang saat refresh) ──
+          try {
+            const sdRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'specialDates');
+            const sdSnap = await getDoc(sdRef);
+            if (sdSnap.exists() && sdSnap.data().data) {
+              setSpecialDates(prev => ({ ...prev, ...sdSnap.data().data }));
+            }
+          } catch (e) { /* abaikan jika gagal */ }
+
         } catch (error) { showToast("Terjadi kesalahan saat memuat hak akses.", "error"); }
       } else {
         setAppUser(null); setUserRole(null);
@@ -341,6 +324,8 @@ export default function App() {
   const [calendarModal, setCalendarModal] = useState({ isOpen: false, dateStr: '', day: '', type: 'NORMAL', name: '' });
 
   const [selectedZone, setSelectedZone] = useState('SEMUA AREA');
+  const [filterMapKategori, setFilterMapKategori] = useState('Semua');
+  const [filterMapJenis, setFilterMapJenis] = useState('Semua');
   const mapRef = useRef(null);
   const markersRef = useRef({});
   const userMarkerRef = useRef(null);
@@ -412,7 +397,7 @@ export default function App() {
 
   // INIT LEAFLET MAP
   useEffect(() => {
-    if (activeMenu === 'peta' && isLeafletLoaded) {
+    if (activeMenu === 'peta' && isLeafletLoaded && appUser) {
       const initTimeout = setTimeout(() => {
         if (!mapRef.current && document.getElementById('ragunan-map')) {
            const ragunanBounds = window.L.latLngBounds([ [-6.325000, 106.810000], [-6.295000, 106.835000] ]);
@@ -433,7 +418,7 @@ export default function App() {
          setIsTrackingLocation(false); mapRef.current.remove(); mapRef.current = null; userMarkerRef.current = null; setSelectedMapMerchant(null); routeLayerRef.current = null; setRouteInfo(null);
       }
     }
-  }, [activeMenu, isLeafletLoaded]);
+  }, [activeMenu, isLeafletLoaded, appUser]);
 
   // Hapus rute jika popup diclose dan reset status minimize
   useEffect(() => {
@@ -458,7 +443,11 @@ export default function App() {
       markersRef.current = {};
 
       merchants.forEach(m => {
-        if (m.lat && m.lng && (selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')))) {
+        const matchZone = selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', ''));
+        const matchKat = filterMapKategori === 'Semua' || m.kategori === filterMapKategori;
+        const matchJenis = filterMapJenis === 'Semua' || (m.jenisUsaha && m.jenisUsaha.trim() === filterMapJenis);
+
+        if (m.lat && m.lng && matchZone && matchKat && matchJenis) {
           const isNunggak = m.totalTunggakan > 0;
           const isSelected = selectedMapMerchant?.uid === m.uid;
           
@@ -487,7 +476,7 @@ export default function App() {
     }, 150);
 
     return () => clearTimeout(renderTimeout);
-  }, [merchants, activeMenu, isLeafletLoaded, selectedZone]);
+  }, [merchants, activeMenu, isLeafletLoaded, selectedZone, filterMapKategori, filterMapJenis]);
 
   // EFFECT UNTUK UPDATE PIN "BIP-BIP"
   useEffect(() => {
@@ -790,7 +779,8 @@ export default function App() {
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(tahun, bulan - 1, i); const dayOfWeek = date.getDay(); const dateStr = `${tahun}-${String(bulan).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
       const statusSpesial = specialDates[dateStr]?.type;
-      if (statusSpesial === 'LIBUR' || statusSpesial === 'PEAK') hariRamai++; else if (statusSpesial === 'TUTUP') tutupOperasional++; else if (statusSpesial === 'BUKA') hariBiasa++; else if (dayOfWeek === 1) tutupOperasional++; else if (dayOfWeek === 0 || dayOfWeek === 6) hariRamai++; else hariBiasa++; 
+      // LIBUR, CUTI BERSAMA, dan PEAK = tarif ramai (Rp 15k)
+      if (statusSpesial === 'LIBUR' || statusSpesial === 'CUTI' || statusSpesial === 'PEAK') hariRamai++; else if (statusSpesial === 'TUTUP') tutupOperasional++; else if (statusSpesial === 'BUKA') hariBiasa++; else if (dayOfWeek === 1) tutupOperasional++; else if (dayOfWeek === 0 || dayOfWeek === 6) hariRamai++; else hariBiasa++; 
     }
     return { hariBiasa, hariRamai, tutupOperasional, tarifHarianFull: (hariBiasa * 10000) + (hariRamai * 15000), tarifHarianNonstop: (hariBiasa * 10000) + (tutupOperasional * 10000) + (hariRamai * 15000), tarifWeekendSaja: (hariRamai * 15000) };
   };
@@ -1028,8 +1018,21 @@ export default function App() {
   const masterDataStats = useMemo(() => {
     const kategoriCount = { 'PKL': 0, 'LOKSEM': 0, 'TIKAR': 0, 'JURU FOTO': 0, 'LISTRIK': 0 };
     merchants.forEach(m => { if (kategoriCount[m.kategori] !== undefined) kategoriCount[m.kategori]++; });
-    return { total: merchants.length, kategori: kategoriCount };
-  }, [merchants]);
+
+    // Hitung komposisi jenis usaha berdasarkan lokasi yang dipilih
+    const sumberData = filterLokasi === 'Semua' ? merchants : merchants.filter(m => m.keterangan === filterLokasi);
+    const jenisUsahaMap: Record<string, number> = {};
+    sumberData.forEach(m => {
+      const j = (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha.trim() : 'Belum Ada Data';
+      jenisUsahaMap[j] = (jenisUsahaMap[j] || 0) + 1;
+    });
+    // Urutkan terbanyak di atas
+    const jenisUsahaSorted = Object.entries(jenisUsahaMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10); // max 10 jenis teratas
+
+    return { total: merchants.length, kategori: kategoriCount, jenisUsahaSorted, lokasiTotal: sumberData.length };
+  }, [merchants, filterLokasi]);
 
   const handleMenuClick = (menu) => { setActiveMenu(menu); setIsMobileMenuOpen(false); };
 
@@ -1070,59 +1073,14 @@ export default function App() {
 
         if (!appUser) {
           return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4 relative overflow-hidden">
-               <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-               <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-emerald-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-               
-               <div className="bg-white/90 backdrop-blur-xl p-8 rounded-3xl shadow-2xl w-full max-w-md border border-white/50 relative z-10">
-                   <div className="flex justify-center mb-6">
-                      <div className="w-20 h-20 transform hover:scale-105 transition-transform">
-                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" className="w-full h-full drop-shadow-xl">
-                           <rect x="8" y="28" width="48" height="22" fill="#0f172a" rx="4"/>
-                           <rect x="12" y="10" width="40" height="18" fill="#3b82f6" rx="2"/>
-                           <circle cx="20" cy="56" r="6" fill="#334155"/>
-                           <circle cx="44" cy="56" r="6" fill="#334155"/>
-                           <circle cx="20" cy="56" r="2" fill="#cbd5e1"/>
-                           <circle cx="44" cy="56" r="2" fill="#cbd5e1"/>
-                           <text x="32" y="44" fontFamily="Arial, sans-serif" fontSize="14" fontWeight="900" fill="#f8fafc" textAnchor="middle">TMR</text>
-                           <path d="M 6 28 L 12 10" stroke="#0f172a" strokeWidth="3" strokeLinecap="round"/>
-                           <path d="M 58 28 L 52 10" stroke="#0f172a" strokeWidth="3" strokeLinecap="round"/>
-                         </svg>
-                      </div>
-                   </div>
-                   
-                   <div className="text-center mb-8">
-                      <h1 className="text-2xl font-black text-slate-800 tracking-tight leading-tight">Aplikasi Data Pelaku Usaha Terpadu</h1>
-                      <p className="text-sm font-bold text-blue-600 mt-2 uppercase tracking-widest">UP TM Ragunan</p>
-                   </div>
-
-                   <form onSubmit={handleLogin} className="space-y-5">
-                      <div>
-                         <label className="block text-[11px] font-extrabold text-slate-500 mb-1.5 uppercase tracking-wider">Alamat Email Terdaftar</label>
-                         <div className="relative">
-                            <Mail className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                            <input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-700 text-sm" placeholder="Ketik email..." />
-                         </div>
-                      </div>
-                      <div>
-                         <label className="block text-[11px] font-extrabold text-slate-500 mb-1.5 uppercase tracking-wider">Kata Sandi (Password)</label>
-                         <div className="relative">
-                            <Lock className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                            <input type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-slate-700 text-sm" placeholder="••••••••" />
-                         </div>
-                      </div>
-                      <button type="submit" disabled={isLoggingIn} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 mt-6 disabled:opacity-70 disabled:cursor-not-allowed">
-                         {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : "Masuk ke Sistem Terpadu"}
-                      </button>
-                   </form>
-
-                   <div className="mt-8 text-center border-t border-slate-100 pt-6">
-                      <p className="text-[10px] text-slate-500 font-bold flex items-center justify-center gap-1.5">
-                         <ShieldAlert className="w-3 h-3 text-emerald-500" /> Tersambung aman ke Firebase Auth
-                      </p>
-                   </div>
-               </div>
-            </div>
+            <AuthScreen 
+              loginEmail={loginEmail}
+              setLoginEmail={setLoginEmail}
+              loginPassword={loginPassword}
+              setLoginPassword={setLoginPassword}
+              handleLogin={handleLogin}
+              isLoggingIn={isLoggingIn}
+            />
           );
         }
 
@@ -1150,9 +1108,7 @@ export default function App() {
                 <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden p-2 text-slate-400 hover:text-white rounded-lg bg-slate-800 transition-colors"><X className="w-5 h-5" /></button>
               </div>
               <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
-                {userRole === 'admin' && (
-                   <button onClick={() => handleMenuClick('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard className="w-5 h-5" /> Dashboard Tagihan</button>
-                )}
+                    <button onClick={() => handleMenuClick('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard className="w-5 h-5" /> Dashboard Tagihan</button>
                 
                 <button onClick={() => handleMenuClick('peta')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'peta' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><MapIcon className="w-5 h-5" /> Peta Sebaran Real-Time</button>
                 
@@ -1200,8 +1156,8 @@ export default function App() {
 
               <main id="main-scroll-area" className="flex-1 overflow-y-auto p-4 lg:p-8 bg-slate-50/50 scroll-smooth relative">
                 
-                {/* 1. KONTEN DASHBOARD ADMIN */}
-                {userRole === 'admin' && activeMenu === 'dashboard' && (
+                {/* 1. KONTEN DASHBOARD TAGIHAN */}
+                {activeMenu === 'dashboard' && (
                   <div className="max-w-7xl mx-auto space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">
@@ -1276,7 +1232,8 @@ export default function App() {
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="overflow-x-auto">
+                      {/* TAMPILAN TABEL (DESKTOP) */}
+                      <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left text-sm text-slate-600">
                           <thead className="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold border-b border-slate-200 tracking-wider">
                             <tr>
@@ -1343,14 +1300,67 @@ export default function App() {
                           </tbody>
                         </table>
                       </div>
+                      
+                      {/* TAMPILAN KARTU (MOBILE) */}
+                      <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                        {isDbLoading && merchants.length === 0 ? (
+                           <div className="px-6 py-12 text-center"><Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-2"/> Memuat Data dari Cloud...</div>
+                        ) : filteredDashboardMerchants.map((row, idx) => {
+                           let tagihanAktual = row.tagihanTetapBulanan;
+                           if (row.tipeTarif === 'HARIAN_FULL') tagihanAktual = calStats.tarifHarianFull;
+                           if (row.tipeTarif === 'HARIAN_FULL_NONSTOP') tagihanAktual = calStats.tarifHarianNonstop;
+                           if (row.tipeTarif === 'HARIAN_WEEKEND') tagihanAktual = calStats.tarifWeekendSaja;
+
+                           return (
+                             <div key={idx} className="p-4 hover:bg-slate-50 transition-colors flex flex-col gap-3">
+                               <div className="flex justify-between items-start">
+                                 <div>
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border mb-1 ${row.kategori==='LOKSEM'?'bg-purple-100 text-purple-800':row.kategori==='TIKAR'?'bg-orange-100 text-orange-800':row.kategori==='LISTRIK'?'bg-amber-100 text-amber-800 border-amber-200':'bg-blue-100 text-blue-800'}`}>{row.kategori}</span>
+                                    <div className="font-bold text-slate-800 text-base leading-tight uppercase">{row.nama}</div>
+                                    <div className="font-mono text-xs font-bold text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                      {row.accountId} 
+                                      {row.fotoLapak && <ImageIcon className="w-3.5 h-3.5 text-blue-500"/>}
+                                    </div>
+                                 </div>
+                                 <button onClick={() => setSelectedMerchant(row)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"><Eye className="w-4 h-4"/></button>
+                               </div>
+                               
+                               {row.jenisUsaha && row.jenisUsaha !== '-' && (<div className="text-[10px] font-extrabold text-blue-600 tracking-wide uppercase">{row.jenisUsaha}</div>)}
+                               <div className="text-[11px] text-slate-500 leading-snug line-clamp-2"><MapPin className="w-3 h-3 inline mr-1 text-slate-400"/> {row.keterangan}</div>
+                               
+                               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col gap-2 mt-1">
+                                 <select value={row.tipeTarif} onChange={(e) => gantiTipeTarif(row, e.target.value)} className="text-[11px] font-bold px-2 py-2 border rounded outline-none w-full bg-white text-slate-700">
+                                    <option value="HARIAN_FULL">Harian - Senin Tutup</option>
+                                    <option value="HARIAN_FULL_NONSTOP">Harian - Nonstop</option>
+                                    <option value="HARIAN_WEEKEND">Harian - Weekend Saja</option>
+                                    <option value="TETAP">Bulanan Tetap / Dinamis</option>
+                                 </select>
+                                 <div className="flex justify-between items-center text-xs mt-1">
+                                   <span className="text-slate-500 font-medium">Tagihan:</span>
+                                   <b className="text-slate-800 text-sm">{formatRp(tagihanAktual)}</b>
+                                 </div>
+                               </div>
+
+                               <div className="flex justify-between items-center mt-1">
+                                 <span className={`text-[10px] px-2.5 py-1 rounded-md font-bold border ${row.totalTunggakan === 0 && (row.riwayatTagihan && row.riwayatTagihan.length > 0) ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : row.totalTunggakan > 0 ? 'bg-red-100 text-red-800 border-red-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                   {row.statusTerakhir}
+                                 </span>
+                                 {row.totalTunggakan > 0 && <div className="font-bold text-red-700 text-xs bg-red-50 px-2 py-1 rounded border border-red-200">Total: {formatRp(row.totalTunggakan)}</div>}
+                               </div>
+                               
+                             </div>
+                           );
+                        })}
+                        {!isDbLoading && filteredDashboardMerchants.length === 0 && <div className="p-8 text-center text-slate-400">Tidak ada data ditemukan. Silakan tambahkan data.</div>}
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {/* 2. KONTEN PETA (DENGAN ANIMASI & RUTE) */}
                 {activeMenu === 'peta' && (
-                  <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-8rem)] animate-in fade-in relative">
-                    <div className="w-full h-[55vh] lg:h-auto lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
+                  <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-5rem)] animate-in fade-in relative">
+                    <div className="w-full h-[50vh] lg:h-full lg:flex-1 bg-slate-200 rounded-2xl relative overflow-hidden shadow-xl border border-slate-300 flex flex-col z-0 shrink-0">
                        <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 flex justify-between items-start z-[1000] pointer-events-none gap-2">
                           <div className="bg-white/90 backdrop-blur px-3 py-2 sm:px-4 sm:py-3 rounded-xl shadow-lg border border-slate-200 pointer-events-auto max-w-[60%] sm:max-w-none">
                             <h3 className="font-extrabold flex items-center gap-1.5 text-slate-800 text-xs sm:text-sm"><MapIcon className="w-4 h-4 text-blue-600 shrink-0"/> <span className="truncate">Satelit TM Ragunan</span></h3>
@@ -1393,7 +1403,7 @@ export default function App() {
                                     <div className="truncate">
                                         <h4 className="font-bold text-slate-800 text-sm truncate pr-2">{selectedMapMerchant.nama}</h4>
                                         {routeInfo ? (
-                                           <p className="text-[10px] text-blue-600 font-bold truncate flex items-center gap-1"><PersonWalking className="w-3 h-3"/> {routeInfo.distance} • {routeInfo.duration}</p>
+                                           <p className="text-[10px] text-blue-600 font-bold truncate flex items-center gap-1"><Footprints className="w-3 h-3"/> {routeInfo.distance} • {routeInfo.duration}</p>
                                         ) : (
                                            <p className="text-[10px] text-slate-500 truncate">{selectedMapMerchant.keterangan}</p>
                                         )}
@@ -1463,7 +1473,7 @@ export default function App() {
                                       {routeInfo && (
                                          <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-lg flex items-center justify-between text-emerald-800 mt-1">
                                             <div className="flex items-center gap-2">
-                                               <PersonWalking className="w-4 h-4"/>
+                                               <Footprints className="w-4 h-4"/>
                                                <div className="text-[10px] font-bold leading-tight">
                                                   <p>Estimasi ({routeInfo.source}):</p>
                                                   <p className="text-xs font-black">{routeInfo.duration}</p>
@@ -1485,105 +1495,105 @@ export default function App() {
                        )}
 
                        <div id="ragunan-map" className="w-full h-full z-0"></div>
-                       
-                       {!isLeafletLoaded && (
-                         <div className="absolute inset-0 bg-slate-100 flex items-center justify-center flex-col z-10">
-                           <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-blue-500 mb-2" />
-                           <p className="text-xs sm:text-sm font-bold text-slate-500">Memuat Engine Peta...</p>
-                         </div>
-                       )}
-                    </div>
+                        
+                        {!isLeafletLoaded && (
+                          <div className="absolute inset-0 bg-slate-100 flex items-center justify-center flex-col z-10">
+                            <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin text-blue-500 mb-2" />
+                            <p className="text-xs sm:text-sm font-bold text-slate-500">Memuat Engine Peta...</p>
+                          </div>
+                        )}
+                     </div>
 
-                    <div className="w-full h-[60vh] lg:h-auto lg:w-[380px] bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden shrink-0 z-10 relative">
-                       <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 shrink-0">
-                          <label className="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1.5 sm:mb-2 uppercase tracking-widest"><Filter className="w-3.5 h-3.5 inline mb-0.5"/> Filter Zonasi Peta</label>
-                          <select value={selectedZone} onChange={e => { setSelectedZone(e.target.value); setSelectedMapMerchant(null); }} className="w-full px-3 py-2 sm:py-2.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm font-bold text-slate-700 shadow-sm outline-none cursor-pointer focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            {mapZonesData.map((z, i) => <option key={i} value={z.id}>{z.name}</option>)}
-                          </select>
-                       </div>
+                     <div className="w-full lg:h-full lg:w-[380px] bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col overflow-hidden shrink-0 z-10 relative">
+                        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 shrink-0">
+                           <label className="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1.5 sm:mb-2 uppercase tracking-widest"><Filter className="w-3.5 h-3.5 inline mb-0.5"/> Filter Zonasi Peta</label>
+                           <select value={selectedZone} onChange={e => { setSelectedZone(e.target.value); setSelectedMapMerchant(null); }} className="w-full px-3 py-2 sm:py-2.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm font-bold text-slate-700 shadow-sm outline-none cursor-pointer focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                             {mapZonesData.map((z, i) => <option key={i} value={z.id}>{z.name}</option>)}
+                           </select>
+                        </div>
 
                        {(() => {
+                         // Filter berdasarkan zona, kategori, dan jenis usaha
                          const merchantsInZoneBase = merchants.filter(m => selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')));
                          const merchantsInZone = merchantsInZoneBase.filter(m => {
                             const matchKat = filterMapKategori === 'Semua' || m.kategori === filterMapKategori;
                             const matchJenis = filterMapJenis === 'Semua' || (m.jenisUsaha && m.jenisUsaha.trim() === filterMapJenis);
                             return matchKat && matchJenis;
                          });
-
-                         // Hitung jenis dagangan di area ini
+                         
                          const jenisMapSorted = Object.entries(merchantsInZoneBase.reduce((acc, m) => {
-                            if (m.jenisUsaha && m.jenisUsaha !== '-') acc[m.jenisUsaha.trim()] = (acc[m.jenisUsaha.trim()] || 0) + 1;
+                            if (m.jenisUsaha && m.jenisUsaha !== '-') acc[m.jenisUsaha] = (acc[m.jenisUsaha] || 0) + 1;
                             return acc;
                          }, {})).sort((a,b) => b[1] - a[1]);
 
                          const nunggakCount = merchantsInZone.filter(m => m.totalTunggakan > 0).length;
                          const totalUangNunggak = merchantsInZone.reduce((sum, m) => sum + m.totalTunggakan, 0);
 
-                         return (
-                           <>
-                             {/* ── FILTER KATEGORI & JENIS DAGANGAN ── */}
-                             <div className="p-3 border-b border-slate-200 bg-white space-y-2.5">
-                               {/* Chips Kategori */}
-                               <div>
-                                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Filter Kategori</p>
-                                 <div className="flex flex-wrap gap-1">
-                                   {['Semua', 'PKL', 'LOKSEM', 'TIKAR', 'JURU FOTO', 'LISTRIK'].map(k => (
-                                     <button
-                                       key={k}
-                                       onClick={() => { setFilterMapKategori(k); setSelectedMapMerchant(null); }}
-                                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95
-                                         ${filterMapKategori === k
-                                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                                           : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600'}`}
-                                     >
-                                       {k === 'Semua' ? '🗂 Semua' : k}
-                                     </button>
-                                   ))}
-                                 </div>
-                               </div>
+                          return (
+                            <>
+                              {/* ── FILTER KATEGORI & JENIS DI SIDEBAR ── */}
+                              <div className="p-3 border-b border-slate-200 bg-white space-y-2.5">
+                                {/* Chips Kategori */}
+                                <div>
+                                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Filter Kategori</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {['Semua', 'PKL', 'LOKSEM', 'TIKAR', 'JURU FOTO', 'LISTRIK'].map(k => (
+                                      <button
+                                        key={k}
+                                        onClick={() => { setFilterMapKategori(k); setSelectedMapMerchant(null); }}
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95
+                                          ${filterMapKategori === k
+                                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                            : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600'}`}
+                                      >
+                                        {k === 'Semua' ? '🗂 Semua' : k}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
 
-                               {/* Chips Jenis Dagangan */}
-                               {jenisMapSorted.length > 0 && (
-                                 <div>
-                                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">🛒 Jenis Dagangan di Area Ini</p>
-                                   <div className="flex flex-wrap gap-1 max-h-[100px] overflow-y-auto pr-1">
-                                     {jenisMapSorted.map(([jenis, count]) => (
-                                       <button
-                                         key={jenis}
-                                         onClick={() => { setFilterMapJenis(filterMapJenis === jenis ? 'Semua' : jenis); setSelectedMapMerchant(null); }}
-                                         title={`Filter: ${jenis}`}
-                                         className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95
-                                           ${filterMapJenis === jenis
-                                             ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                                             : 'bg-white text-slate-600 border-slate-300 hover:border-purple-400 hover:text-purple-700'}`}
-                                       >
-                                         <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black
-                                           ${filterMapJenis === jenis ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
-                                         {jenis}
-                                       </button>
-                                     ))}
-                                   </div>
-                                 </div>
-                               )}
+                                {/* Chips Jenis Usaha */}
+                                {jenisMapSorted.length > 0 && (
+                                  <div>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Jenis Usaha di Area Ini</p>
+                                    <div className="flex flex-wrap gap-1 max-h-[85px] overflow-y-auto pr-1">
+                                      {jenisMapSorted.map(([jenis, count]) => (
+                                        <button
+                                          key={jenis}
+                                          onClick={() => { setFilterMapJenis(filterMapJenis === jenis ? 'Semua' : jenis); setSelectedMapMerchant(null); }}
+                                          title={`Filter: ${jenis}`}
+                                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95
+                                            ${filterMapJenis === jenis
+                                              ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                              : 'bg-white text-slate-600 border-slate-300 hover:border-purple-400 hover:text-purple-700'}`}
+                                        >
+                                          <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black
+                                            ${filterMapJenis === jenis ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                                          {jenis}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
 
-                               {/* Reset + counter */}
-                               {(filterMapKategori !== 'Semua' || filterMapJenis !== 'Semua') && (
-                                 <div className="flex items-center justify-between pt-1">
-                                   <span className="text-[10px] text-slate-500 font-semibold">
-                                     Menampilkan <strong>{merchantsInZone.length}</strong> dari {merchantsInZoneBase.length} pedagang
-                                   </span>
-                                   <button
-                                     onClick={() => { setFilterMapKategori('Semua'); setFilterMapJenis('Semua'); setSelectedMapMerchant(null); }}
-                                     className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-700 font-bold"
-                                   >
-                                     <XCircle className="w-3 h-3" /> Reset
-                                   </button>
-                                 </div>
-                               )}
-                             </div>
+                                {/* Reset + counter */}
+                                {(filterMapKategori !== 'Semua' || filterMapJenis !== 'Semua') && (
+                                  <div className="flex items-center justify-between pt-1">
+                                    <span className="text-[10px] text-slate-500 font-semibold">
+                                      Menampilkan <strong>{merchantsInZone.length}</strong> dari {merchantsInZoneBase.length} pedagang
+                                    </span>
+                                    <button
+                                      onClick={() => { setFilterMapKategori('Semua'); setFilterMapJenis('Semua'); setSelectedMapMerchant(null); }}
+                                      className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-700 font-bold"
+                                    >
+                                      <XCircle className="w-3 h-3" /> Reset
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
 
-                             <div className="p-4 sm:p-5 bg-slate-800 text-white shrink-0">
-                               <div className="flex justify-between items-start mb-3 sm:mb-4">
+                             <div className="p-3 sm:p-4 bg-slate-800 text-white shrink-0">
+                               <div className="flex justify-between items-start mb-2 sm:mb-3">
                                  <div>
                                    <h4 className="text-[9px] sm:text-[10px] font-extrabold text-blue-400 uppercase tracking-widest mb-0.5 sm:mb-1">Rangkuman Area</h4>
                                    <h3 className="text-base sm:text-lg font-black tracking-tight leading-none">{mapZonesData.find(z => z.id === selectedZone)?.name || selectedZone}</h3>
@@ -1593,12 +1603,12 @@ export default function App() {
                                    <p className="text-base sm:text-lg font-bold">{merchantsInZone.length}</p>
                                  </div>
                                </div>
-                               <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-1 sm:mt-2">
-                                 <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-2 sm:p-2.5">
+                               <div className="grid grid-cols-2 gap-2 mt-1">
+                                 <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-2">
                                    <p className="text-[8px] sm:text-[9px] font-bold text-red-400 uppercase">Perlu Ditagih</p>
                                    <p className="text-sm sm:text-base font-bold text-red-300">{nunggakCount} <span className="text-[9px] sm:text-[10px]">Orang</span></p>
                                  </div>
-                                 <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-2 sm:p-2.5">
+                                 <div className="bg-slate-900/60 border border-slate-700 rounded-lg p-2">
                                    <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase">Potensi Kas</p>
                                    <p className="text-[11px] sm:text-xs font-bold text-white mt-0.5 sm:mt-1">{formatRp(totalUangNunggak)}</p>
                                  </div>
@@ -1621,7 +1631,6 @@ export default function App() {
                                          <div className="truncate">
                                            <h5 className="font-bold text-xs sm:text-sm text-slate-800 truncate group-hover:text-blue-600 transition-colors flex items-center gap-1">{m.nama} {m.fotoLapak && <ImageIcon className="w-3 h-3 text-emerald-500" />}</h5>
                                            <p className="text-[9px] sm:text-[10px] text-slate-500 font-mono truncate">{m.accountId} • {m.kategori}</p>
-                                            {m.jenisUsaha && m.jenisUsaha !== '-' && <p className="text-[8px] sm:text-[9px] text-blue-600 font-bold uppercase truncate">{m.jenisUsaha}</p>}
                                          </div>
                                          {m.totalTunggakan > 0 ? (
                                             <span className="shrink-0 bg-red-100 text-red-700 px-1.5 sm:px-2 py-0.5 rounded text-[8px] sm:text-[9px] font-extrabold border border-red-200">HUTANG</span>
@@ -1680,40 +1689,182 @@ export default function App() {
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                      <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider">Total Entri</p>
+                      {/* ── TOTAL ENTRI (reset filter) ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard('Semua')}
+                        title="Tampilkan semua data"
+                        className={`bg-blue-50 p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'Semua' ? 'border-blue-500 ring-2 ring-blue-400 bg-blue-100' : 'border-blue-200'}`}>
+                         <p className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'Semua' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block"></span>}
+                           Total Entri
+                         </p>
                          <p className="text-3xl font-black text-blue-800 mt-1">{masterDataStats.total}</p>
+                         <p className="text-[9px] text-blue-400 mt-1">Klik untuk tampilkan semua</p>
                       </div>
-                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">PKL Umum</p>
+
+                      {/* ── PKL UMUM ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'PKL' ? 'Semua' : 'PKL')}
+                        title="Filter PKL Umum"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'PKL' ? 'border-slate-600 ring-2 ring-slate-500 bg-slate-100' : 'bg-white border-slate-200'}`}>
+                         <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'PKL' && <span className="w-1.5 h-1.5 rounded-full bg-slate-600 inline-block"></span>}
+                           PKL Umum
+                         </p>
                          <p className="text-3xl font-black text-slate-800 mt-1">{masterDataStats.kategori['PKL']}</p>
+                         <p className="text-[9px] text-slate-400 mt-1">Klik untuk filter</p>
                       </div>
-                      <div className="bg-purple-50 p-4 rounded-xl border border-purple-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider">Lapak Loksem</p>
+
+                      {/* ── LAPAK LOKSEM ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'LOKSEM' ? 'Semua' : 'LOKSEM')}
+                        title="Filter Lapak Loksem"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'LOKSEM' ? 'border-purple-500 ring-2 ring-purple-400 bg-purple-100' : 'bg-purple-50 border-purple-200'}`}>
+                         <p className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'LOKSEM' && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block"></span>}
+                           Lapak Loksem
+                         </p>
                          <p className="text-3xl font-black text-purple-800 mt-1">{masterDataStats.kategori['LOKSEM']}</p>
+                         <p className="text-[9px] text-purple-400 mt-1">Klik untuk filter</p>
                       </div>
-                      <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-orange-600 uppercase tracking-wider">Sewa Tikar</p>
+
+                      {/* ── SEWA TIKAR ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'TIKAR' ? 'Semua' : 'TIKAR')}
+                        title="Filter Sewa Tikar"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'TIKAR' ? 'border-orange-500 ring-2 ring-orange-400 bg-orange-100' : 'bg-orange-50 border-orange-200'}`}>
+                         <p className="text-[10px] font-extrabold text-orange-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'TIKAR' && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>}
+                           Sewa Tikar
+                         </p>
                          <p className="text-3xl font-black text-orange-800 mt-1">{masterDataStats.kategori['TIKAR']}</p>
+                         <p className="text-[9px] text-orange-400 mt-1">Klik untuk filter</p>
                       </div>
-                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider">Juru Foto</p>
+
+                      {/* ── JURU FOTO ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'JURU FOTO' ? 'Semua' : 'JURU FOTO')}
+                        title="Filter Juru Foto"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'JURU FOTO' ? 'border-indigo-500 ring-2 ring-indigo-400 bg-indigo-100' : 'bg-indigo-50 border-indigo-200'}`}>
+                         <p className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'JURU FOTO' && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>}
+                           Juru Foto
+                         </p>
                          <p className="text-3xl font-black text-indigo-800 mt-1">{masterDataStats.kategori['JURU FOTO']}</p>
+                         <p className="text-[9px] text-indigo-400 mt-1">Klik untuk filter</p>
                       </div>
-                      <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 shadow-sm flex flex-col justify-center">
-                         <p className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wider">Tagihan Listrik</p>
+
+                      {/* ── TAGIHAN LISTRIK ── */}
+                      <div
+                        onClick={() => setFilterKategoriDashboard(filterKategoriDashboard === 'LISTRIK' ? 'Semua' : 'LISTRIK')}
+                        title="Filter Tagihan Listrik"
+                        className={`p-4 rounded-xl border shadow-sm flex flex-col justify-center cursor-pointer transition-all duration-150 hover:shadow-md hover:-translate-y-0.5 active:scale-95 select-none
+                          ${filterKategoriDashboard === 'LISTRIK' ? 'border-amber-500 ring-2 ring-amber-400 bg-amber-100' : 'bg-amber-50 border-amber-200'}`}>
+                         <p className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wider flex items-center gap-1">
+                           {filterKategoriDashboard === 'LISTRIK' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span>}
+                           Tagihan Listrik
+                         </p>
                          <p className="text-3xl font-black text-amber-800 mt-1">{masterDataStats.kategori['LISTRIK']}</p>
+                         <p className="text-[9px] text-amber-400 mt-1">Klik untuk filter</p>
                       </div>
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center gap-4">
-                        <div className="relative flex-grow max-w-sm">
-                          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                          <input type="text" placeholder="Cari Nama / NIK / ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"/>
+                      {/* ── FILTER BAR ── */}
+                      <div className="p-4 border-b border-slate-200 bg-slate-50 space-y-3">
+                        {/* Baris 1: Search + Dropdowns */}
+                        <div className="flex flex-wrap items-center gap-3">
+                          {/* Search */}
+                          <div className="relative flex-grow min-w-[200px] max-w-xs">
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input type="text" placeholder="Cari Nama / NIK / ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"/>
+                          </div>
+
+                          {/* Filter Lokasi */}
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-slate-500 shrink-0" />
+                            <select
+                              value={filterLokasi}
+                              onChange={(e) => setFilterLokasi(e.target.value)}
+                              className={`px-3 py-2 border rounded-lg outline-none text-sm font-semibold cursor-pointer focus:ring-2 focus:ring-blue-500 min-w-[160px]
+                                ${filterLokasi !== 'Semua' ? 'border-green-500 bg-green-50 text-green-800 ring-1 ring-green-400' : 'border-slate-300 bg-white text-slate-700'}`}
+                            >
+                              <option value="Semua">📍 Semua Lokasi</option>
+                              {uniqueLokasi.map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+                          </div>
+
+                          {/* Filter Jenis Usaha */}
+                          <div className="flex items-center gap-2">
+                            <Store className="w-4 h-4 text-slate-500 shrink-0" />
+                            <select
+                              value={filterJenisUsaha}
+                              onChange={(e) => setFilterJenisUsaha(e.target.value)}
+                              className={`px-3 py-2 border rounded-lg outline-none text-sm font-semibold cursor-pointer focus:ring-2 focus:ring-blue-500 min-w-[180px]
+                                ${filterJenisUsaha !== 'Semua' ? 'border-purple-500 bg-purple-50 text-purple-800 ring-1 ring-purple-400' : 'border-slate-300 bg-white text-slate-700'}`}
+                            >
+                              <option value="Semua">🛒 Semua Jenis Usaha</option>
+                              {uniqueJenisUsaha.map(u => <option key={u} value={u}>{u}</option>)}
+                            </select>
+                          </div>
+
+                          {/* Reset & counter */}
+                          <div className="flex items-center gap-2 ml-auto">
+                            <span className="text-xs text-slate-500 font-semibold bg-slate-200 px-2.5 py-1 rounded-full">
+                              {filteredDashboardMerchants.length} / {merchants.length} data
+                            </span>
+                            {(filterLokasi !== 'Semua' || filterJenisUsaha !== 'Semua' || filterKategoriDashboard !== 'Semua' || searchTerm) && (
+                              <button
+                                onClick={() => { setFilterLokasi('Semua'); setFilterJenisUsaha('Semua'); setFilterKategoriDashboard('Semua'); setSearchTerm(''); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold transition-colors"
+                              >
+                                <XCircle className="w-3.5 h-3.5" /> Reset Filter
+                              </button>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Baris 2: Insight Komposisi Jenis Usaha per Lokasi */}
+                        {masterDataStats.jenisUsahaSorted.length > 0 && (
+                          <div className="pt-2 border-t border-slate-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide">
+                                Komposisi Jenis Usaha
+                                {filterLokasi !== 'Semua' ? ` — ${filterLokasi}` : ' — Semua Lokasi'}
+                                <span className="ml-1 text-slate-400 font-normal">({masterDataStats.lokasiTotal} pedagang)</span>
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {masterDataStats.jenisUsahaSorted.map(([jenis, count]) => (
+                                <button
+                                  key={jenis}
+                                  onClick={() => setFilterJenisUsaha(filterJenisUsaha === jenis ? 'Semua' : jenis)}
+                                  title={`Filter: ${jenis}`}
+                                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer hover:-translate-y-0.5 active:scale-95
+                                    ${filterJenisUsaha === jenis
+                                      ? 'bg-purple-600 text-white border-purple-600 shadow-md'
+                                      : 'bg-white text-slate-700 border-slate-300 hover:border-purple-400 hover:text-purple-700'}`}
+                                >
+                                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black shrink-0
+                                    ${filterJenisUsaha === jenis ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                    {count}
+                                  </span>
+                                  {jenis}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="overflow-x-auto">
+                      
+                      {/* TAMPILAN TABEL (DESKTOP) */}
+                      <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left text-sm text-slate-600">
                           <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] font-bold border-b border-slate-200 tracking-wider">
                             <tr>
@@ -1773,6 +1924,57 @@ export default function App() {
                           </tbody>
                         </table>
                       </div>
+                      
+                      {/* TAMPILAN KARTU (MOBILE) */}
+                      <div className="md:hidden flex flex-col divide-y divide-slate-100">
+                         {isDbLoading && merchants.length === 0 ? (
+                             <div className="px-6 py-12 text-center"><Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-2"/> Memuat Data dari Cloud...</div>
+                          ) : filteredDashboardMerchants.map((row, idx) => (
+                             <div key={idx} className="p-4 hover:bg-slate-50 transition-colors flex flex-col gap-3">
+                               <div className="flex justify-between items-start">
+                                 <div>
+                                   <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border mb-1 ${row.kategori==='LOKSEM'?'bg-purple-100 text-purple-800':row.kategori==='TIKAR'?'bg-orange-100 text-orange-800':row.kategori==='LISTRIK'?'bg-amber-100 text-amber-800 border-amber-200':'bg-blue-100 text-blue-800'}`}>{row.kategori}</span>
+                                   <div className="font-bold text-slate-800 text-base leading-tight uppercase">{row.nama}</div>
+                                   <div className="font-mono text-xs font-bold text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                      {row.accountId} 
+                                      {row.fotoLapak && <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.5 rounded border border-emerald-100"><Camera className="w-3 h-3"/></div>}
+                                   </div>
+                                 </div>
+                                 <div className="flex flex-col gap-1.5">
+                                    <button onClick={() => setEditModal({ isOpen: true, data: row })} className="p-1.5 flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"><Pencil className="w-4 h-4"/></button>
+                                    {userRole === 'admin' && (
+                                      <button onClick={() => handleDeleteSatuan(row)} className="p-1.5 flex items-center justify-center bg-red-50 text-red-500 hover:bg-red-100 rounded-lg transition-colors"><Trash2 className="w-4 h-4"/></button>
+                                    )}
+                                 </div>
+                               </div>
+                               
+                               <div className="text-[11px] text-slate-500 leading-snug line-clamp-2"><MapPin className="w-3 h-3 inline mr-1 text-slate-400"/> {row.keterangan}</div>
+                               
+                               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col gap-2 mt-1">
+                                  {row.lat && row.lng ? (
+                                     <div className="flex justify-between items-center text-xs">
+                                        <div className="flex items-center gap-1 text-emerald-600 font-bold"><CheckCircle className="w-3.5 h-3.5"/> GPS Ada</div>
+                                        <div className="text-[10px] text-slate-500 font-mono">{Number(row.lat).toFixed(4)}, {Number(row.lng).toFixed(4)}</div>
+                                     </div>
+                                  ) : (
+                                     <div className="flex items-center gap-1 text-red-500 font-bold text-xs"><AlertTriangle className="w-3.5 h-3.5"/> Titik Peta Kosong</div>
+                                  )}
+                               </div>
+
+                               <div className="flex flex-col gap-1 text-xs text-slate-600 mt-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-slate-400"/> HP:</span>
+                                    <span className="font-medium text-slate-800">{row.noHp || '-'}</span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5 text-slate-400"/> Bank:</span>
+                                    <span className="font-medium text-slate-800">{row.rekeningSumber || '-'}</span>
+                                  </div>
+                               </div>
+                               
+                             </div>
+                          ))}
+                     </div>
                     </div>
                   </div>
                 )}
@@ -1802,6 +2004,18 @@ export default function App() {
                         </div>
                         <div className="grid grid-cols-7 gap-2">
                           {(() => {
+                          // Hitung jenis usaha unik di zone ini (sebelum filter jenis)
+                          const merchantsInZoneBase = merchants.filter(m => {
+                            const matchZone = selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', ''));
+                            const matchKat = filterMapKategori === 'Semua' || m.kategori === filterMapKategori;
+                            return matchZone && matchKat;
+                          });
+                          const jenisMapMap: Record<string, number> = {};
+                          merchantsInZoneBase.forEach(m => {
+                            const j = (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha.trim() : 'Belum Ada Data';
+                            jenisMapMap[j] = (jenisMapMap[j] || 0) + 1;
+                          });
+                          const jenisMapSorted = Object.entries(jenisMapMap).sort((a, b) => b[1] - a[1]).slice(0, 12);
                             const daysInMonth = new Date(calYear, calMonth, 0).getDate();
                             const firstDayIndex = new Date(calYear, calMonth - 1, 1).getDay();
                             const days = [];
@@ -1824,6 +2038,10 @@ export default function App() {
                               if (isSpecial === 'LIBUR') { 
                                 baseColor = "bg-red-100 border-red-300 text-red-900 shadow-sm ring-1 ring-red-400"; label = specialDates[dateStr]?.name || "Libur Nasional"; 
                                 showPrice = "Rp 15k"; priceColor = "bg-white/50 text-red-700";
+                              }
+                              else if (isSpecial === 'CUTI') {
+                                baseColor = "bg-purple-100 border-purple-300 text-purple-900 shadow-sm ring-1 ring-purple-400"; label = specialDates[dateStr]?.name || "Cuti Bersama"; 
+                                showPrice = "Rp 15k"; priceColor = "bg-white/50 text-purple-700";
                               } 
                               else if (isSpecial === 'PEAK') { 
                                 baseColor = "bg-amber-100 border-amber-300 text-amber-900 shadow-sm ring-1 ring-amber-400"; label = specialDates[dateStr]?.name || "Peak Season"; 
@@ -1866,10 +2084,19 @@ export default function App() {
                         <div className="bg-slate-800 p-6 rounded-xl shadow-md text-white">
                           <h4 className="font-bold mb-4 border-b border-slate-600 pb-2 flex items-center gap-2"><DollarSign className="w-5 h-5"/> Simulasi Tagihan Bulan Ini</h4>
                           <div className="space-y-3 text-sm">
-                            <div className="flex justify-between items-center"><span className="text-slate-300">Hari Biasa (Rp 10k)</span><span className="font-bold">{calStats.hariBiasa} Hari</span></div>
-                            <div className="flex justify-between items-center"><span className="text-amber-300">Peak / Weekend / Cuti (Rp 15k)</span><span className="font-bold">{calStats.hariRamai} Hari</span></div>
-                            <div className="flex justify-between items-center opacity-70"><span className="text-slate-300">Tutup Operasional</span><span className="font-bold">{calStats.tutupOperasional} Hari</span></div>
-                          </div>
+                             <div className="flex justify-between items-center"><span className="text-slate-300">Hari Biasa (Rp 10k)</span><span className="font-bold">{calStats.hariBiasa} Hari</span></div>
+                             <div className="flex justify-between items-center"><span className="text-amber-300">Weekend / Libur / Cuti (Rp 15k)</span><span className="font-bold">{calStats.hariRamai} Hari</span></div>
+                             <div className="flex justify-between items-center opacity-70"><span className="text-slate-300">Tutup Operasional</span><span className="font-bold">{calStats.tutupOperasional} Hari</span></div>
+                           </div>
+                           <div className="mt-4 pt-3 border-t border-slate-700 space-y-1.5 text-xs">
+                             <p className="text-slate-400 font-bold uppercase tracking-wide mb-2">Legenda Warna Kalender</p>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-emerald-300 border border-emerald-400 shrink-0"></span><span className="text-slate-300">Hari Biasa (Rp 10k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-blue-300 border border-blue-400 shrink-0"></span><span className="text-slate-300">Weekend / Sabtu-Minggu (Rp 15k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-red-300 border border-red-400 shrink-0"></span><span className="text-slate-300">Libur Nasional (Rp 15k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-purple-300 border border-purple-400 shrink-0"></span><span className="text-slate-300">Cuti Bersama SKB (Rp 15k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-amber-300 border border-amber-400 shrink-0"></span><span className="text-slate-300">Peak Season (Rp 15k)</span></div>
+                             <div className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-slate-300 border border-slate-400 shrink-0"></span><span className="text-slate-300">Senin / Tutup Operasional</span></div>
+                           </div>
                           <div className="mt-6 pt-4 border-t border-slate-600 space-y-4">
                             <div className="bg-emerald-900/50 p-3 rounded-lg border border-emerald-800/50">
                               <p className="text-[11px] text-emerald-200 uppercase font-bold tracking-wide">1. Loksem (Nonstop Buka)</p>
