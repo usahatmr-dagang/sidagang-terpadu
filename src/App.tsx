@@ -297,6 +297,8 @@ export default function App() {
   }, [firebaseUser, appUser]);
 
   const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [laporanBulan, setLaporanBulan] = useState('05');
+  const [laporanTahun, setLaporanTahun] = useState('2026');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [searchTerm, setSearchTerm] = useState('');
