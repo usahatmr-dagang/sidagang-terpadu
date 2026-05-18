@@ -1503,12 +1503,85 @@ export default function App() {
                        </div>
 
                        {(() => {
-                         const merchantsInZone = merchants.filter(m => selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')));
+                         merchantsInZoneBase = merchants.filter(m => selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')));
+                         const merchantsInZone = merchantsInZoneBase.filter(m => {
+                            const matchKat = filterMapKategori === 'Semua' || m.kategori === filterMapKategori;
+                            const matchJenis = filterMapJenis === 'Semua' || (m.jenisUsaha && m.jenisUsaha.trim() === filterMapJenis);
+                            return matchKat && matchJenis;
+                         });
+
+                         // Hitung jenis dagangan di area ini
+                         const jenisMapSorted = Object.entries(merchantsInZoneBase.reduce((acc, m) => {
+                            if (m.jenisUsaha && m.jenisUsaha !== '-') acc[m.jenisUsaha.trim()] = (acc[m.jenisUsaha.trim()] || 0) + 1;
+                            return acc;
+                         }, {})).sort((a,b) => b[1] - a[1]);
+
                          const nunggakCount = merchantsInZone.filter(m => m.totalTunggakan > 0).length;
                          const totalUangNunggak = merchantsInZone.reduce((sum, m) => sum + m.totalTunggakan, 0);
 
                          return (
                            <>
+                             {/* ── FILTER KATEGORI & JENIS DAGANGAN ── */}
+                             <div className="p-3 border-b border-slate-200 bg-white space-y-2.5">
+                               {/* Chips Kategori */}
+                               <div>
+                                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Filter Kategori</p>
+                                 <div className="flex flex-wrap gap-1">
+                                   {['Semua', 'PKL', 'LOKSEM', 'TIKAR', 'JURU FOTO', 'LISTRIK'].map(k => (
+                                     <button
+                                       key={k}
+                                       onClick={() => { setFilterMapKategori(k); setSelectedMapMerchant(null); }}
+                                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95
+                                         ${filterMapKategori === k
+                                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                           : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600'}`}
+                                     >
+                                       {k === 'Semua' ? '🗂 Semua' : k}
+                                     </button>
+                                   ))}
+                                 </div>
+                               </div>
+
+                               {/* Chips Jenis Dagangan */}
+                               {jenisMapSorted.length > 0 && (
+                                 <div>
+                                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">🛒 Jenis Dagangan di Area Ini</p>
+                                   <div className="flex flex-wrap gap-1 max-h-[100px] overflow-y-auto pr-1">
+                                     {jenisMapSorted.map(([jenis, count]) => (
+                                       <button
+                                         key={jenis}
+                                         onClick={() => { setFilterMapJenis(filterMapJenis === jenis ? 'Semua' : jenis); setSelectedMapMerchant(null); }}
+                                         title={`Filter: ${jenis}`}
+                                         className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95
+                                           ${filterMapJenis === jenis
+                                             ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                                             : 'bg-white text-slate-600 border-slate-300 hover:border-purple-400 hover:text-purple-700'}`}
+                                       >
+                                         <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black
+                                           ${filterMapJenis === jenis ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                                         {jenis}
+                                       </button>
+                                     ))}
+                                   </div>
+                                 </div>
+                               )}
+
+                               {/* Reset + counter */}
+                               {(filterMapKategori !== 'Semua' || filterMapJenis !== 'Semua') && (
+                                 <div className="flex items-center justify-between pt-1">
+                                   <span className="text-[10px] text-slate-500 font-semibold">
+                                     Menampilkan <strong>{merchantsInZone.length}</strong> dari {merchantsInZoneBase.length} pedagang
+                                   </span>
+                                   <button
+                                     onClick={() => { setFilterMapKategori('Semua'); setFilterMapJenis('Semua'); setSelectedMapMerchant(null); }}
+                                     className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-700 font-bold"
+                                   >
+                                     <XCircle className="w-3 h-3" /> Reset
+                                   </button>
+                                 </div>
+                               )}
+                             </div>
+
                              <div className="p-4 sm:p-5 bg-slate-800 text-white shrink-0">
                                <div className="flex justify-between items-start mb-3 sm:mb-4">
                                  <div>
@@ -1548,6 +1621,7 @@ export default function App() {
                                          <div className="truncate">
                                            <h5 className="font-bold text-xs sm:text-sm text-slate-800 truncate group-hover:text-blue-600 transition-colors flex items-center gap-1">{m.nama} {m.fotoLapak && <ImageIcon className="w-3 h-3 text-emerald-500" />}</h5>
                                            <p className="text-[9px] sm:text-[10px] text-slate-500 font-mono truncate">{m.accountId} • {m.kategori}</p>
+                                            {m.jenisUsaha && m.jenisUsaha !== '-' && <p className="text-[8px] sm:text-[9px] text-blue-600 font-bold uppercase truncate">{m.jenisUsaha}</p>}
                                          </div>
                                          {m.totalTunggakan > 0 ? (
                                             <span className="shrink-0 bg-red-100 text-red-700 px-1.5 sm:px-2 py-0.5 rounded text-[8px] sm:text-[9px] font-extrabold border border-red-200">HUTANG</span>
