@@ -1503,7 +1503,7 @@ export default function App() {
                        </div>
 
                        {(() => {
-                         merchantsInZoneBase = merchants.filter(m => selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')));
+                         const merchantsInZoneBase = merchants.filter(m => selectedZone === 'SEMUA AREA' || String(m.keterangan).toUpperCase().includes(selectedZone.replace('PINTU ', '').replace('AREA ', '')));
                          const merchantsInZone = merchantsInZoneBase.filter(m => {
                             const matchKat = filterMapKategori === 'Semua' || m.kategori === filterMapKategori;
                             const matchJenis = filterMapJenis === 'Semua' || (m.jenisUsaha && m.jenisUsaha.trim() === filterMapJenis);
