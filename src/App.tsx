@@ -1109,6 +1109,8 @@ export default function App() {
               </div>
               <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
                     <button onClick={() => handleMenuClick('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><LayoutDashboard className="w-5 h-5" /> Dashboard Tagihan</button>
+
+                <button onClick={() => handleMenuClick('laporan')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'laporan' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><FileText className="w-5 h-5" /> Laporan Bulanan</button>
                 
                 <button onClick={() => handleMenuClick('peta')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all ${activeMenu === 'peta' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}><MapIcon className="w-5 h-5" /> Peta Sebaran Real-Time</button>
                 
@@ -1140,7 +1142,7 @@ export default function App() {
                    <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden p-2.5 text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shadow-sm"><Menu className="w-5 h-5" /></button>
                    <div>
                      <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">
-                       {activeMenu === 'dashboard' ? 'Dashboard Pemantauan Tagihan' : activeMenu === 'peta' ? 'Pemetaan Lokasi Pedagang Berbasis Satelit' : activeMenu === 'kelola-data' ? 'Pengelolaan Master Data Pedagang' : activeMenu === 'kalender' ? 'Pengaturan Kalender & Tarif' : activeMenu === 'generate' ? 'Pembuatan File Target Bank' : activeMenu === 'manajemen-akun' ? 'Manajemen Akun Firebase' : 'Rekonsiliasi Laporan Bank'}
+                       {activeMenu === 'dashboard' ? 'Dashboard Pemantauan Tagihan' : activeMenu === 'peta' ? 'Pemetaan Lokasi Pedagang Berbasis Satelit' : activeMenu === 'kelola-data' ? 'Pengelolaan Master Data Pedagang' : activeMenu === 'kalender' ? 'Pengaturan Kalender & Tarif' : activeMenu === 'generate' ? 'Pembuatan File Target Bank' : activeMenu === 'laporan' ? 'Laporan Bulanan Autodebet' : activeMenu === 'manajemen-akun' ? 'Manajemen Akun Firebase' : 'Rekonsiliasi Laporan Bank'}
                      </h2>
                      <p className="text-xs font-medium text-slate-500 mt-1 hidden sm:block">
                        {activeMenu === 'kelola-data' ? 'Kelola identitas, titik GPS, dan potret foto lapak pedagang untuk validasi lapangan.' : 'Terkoneksi langsung ke Cloud Database Firebase.'}
@@ -2163,7 +2165,242 @@ export default function App() {
                   </div>
                 )}
 
-                {/* 6. REKON LAPORAN */}
+                {/* 5.5 LAPORAN BULANAN */}
+                {activeMenu === 'laporan' && (() => {
+                  const periodeKey = `${laporanBulan}/${laporanTahun}`;
+                  const bulanNames = ['','Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+                  const hasil = merchants.map(m => {
+                    const riwayat = (m.riwayatTagihan || []).find(r => {
+                      const rp = String(r.periode || '').trim();
+                      return rp === periodeKey || rp.startsWith(periodeKey);
+                    });
+                    return { merchant: m, riwayat };
+                  }).filter(x => x.riwayat);
+
+                  const berhasil = hasil.filter(x => x.riwayat.status === 'LUNAS');
+                  const gagal = hasil.filter(x => x.riwayat.status !== 'LUNAS');
+                  const belumAda = merchants.filter(m => !(m.riwayatTagihan || []).some(r => {
+                    const rp = String(r.periode || '').trim();
+                    return rp === periodeKey || rp.startsWith(periodeKey);
+                  }));
+
+                  const totalMasuk = berhasil.reduce((s, x) => s + (x.riwayat.nominalBayar || 0), 0);
+                  const totalGagal = gagal.reduce((s, x) => s + (x.riwayat.nominalTagihan || 0), 0);
+
+                  const handleDownloadLaporan = () => {
+                    const rows = [];
+                    berhasil.forEach(x => rows.push({
+                      'STATUS': 'BERHASIL', 'ACCOUNT ID': x.merchant.accountId, 'NAMA': x.merchant.nama,
+                      'KATEGORI': x.merchant.kategori, 'JENIS USAHA': x.merchant.jenisUsaha || '-',
+                      'LOKASI': x.merchant.keterangan, 'PERIODE': x.riwayat.periode,
+                      'NOMINAL TAGIHAN': x.riwayat.nominalTagihan, 'NOMINAL BAYAR': x.riwayat.nominalBayar,
+                      'TGL TRANSAKSI': x.riwayat.tglUpdate || '-', 'KETERANGAN': x.riwayat.keterangan || 'Lunas Autodebet',
+                    }));
+                    gagal.forEach(x => rows.push({
+                      'STATUS': 'GAGAL', 'ACCOUNT ID': x.merchant.accountId, 'NAMA': x.merchant.nama,
+                      'KATEGORI': x.merchant.kategori, 'JENIS USAHA': x.merchant.jenisUsaha || '-',
+                      'LOKASI': x.merchant.keterangan, 'PERIODE': x.riwayat.periode,
+                      'NOMINAL TAGIHAN': x.riwayat.nominalTagihan, 'NOMINAL BAYAR': 0,
+                      'TGL TRANSAKSI': x.riwayat.tglUpdate || '-', 'KETERANGAN': x.riwayat.keterangan || 'Gagal Debet',
+                    }));
+                    belumAda.forEach(m => rows.push({
+                      'STATUS': 'BELUM ADA DATA', 'ACCOUNT ID': m.accountId, 'NAMA': m.nama,
+                      'KATEGORI': m.kategori, 'JENIS USAHA': m.jenisUsaha || '-',
+                      'LOKASI': m.keterangan, 'PERIODE': periodeKey,
+                      'NOMINAL TAGIHAN': '-', 'NOMINAL BAYAR': '-', 'TGL TRANSAKSI': '-', 'KETERANGAN': 'Belum ada data transaksi',
+                    }));
+                    const ws = window.XLSX.utils.json_to_sheet(rows);
+                    const wb = window.XLSX.utils.book_new();
+                    window.XLSX.utils.book_append_sheet(wb, ws, 'Laporan');
+                    window.XLSX.writeFile(wb, `LAPORAN_AUTODEBET_${laporanBulan}_${laporanTahun}.xlsx`);
+                  };
+
+                  return (
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+                      {/* Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                          <h2 className="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
+                            <FileText className="w-6 h-6 text-blue-500" /> Laporan Bulanan Autodebet
+                          </h2>
+                          <p className="text-sm text-slate-500 mt-0.5">Rekap hasil autodebet per pedagang untuk periode yang dipilih</p>
+                        </div>
+                        <button onClick={handleDownloadLaporan} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-md transition-all active:scale-95">
+                          <Download className="w-4 h-4" /> Unduh Excel
+                        </button>
+                      </div>
+
+                      {/* Filter Periode */}
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Filter Periode Laporan</p>
+                        <div className="flex flex-wrap gap-3">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase">Bulan</label>
+                            <select value={laporanBulan} onChange={e => setLaporanBulan(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-700 bg-white outline-none focus:border-blue-500 cursor-pointer">
+                              {['01','02','03','04','05','06','07','08','09','10','11','12'].map((b,i) => (
+                                <option key={b} value={b}>{bulanNames[i+1]}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase">Tahun</label>
+                            <select value={laporanTahun} onChange={e => setLaporanTahun(e.target.value)} className="px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-700 bg-white outline-none focus:border-blue-500 cursor-pointer">
+                              {['2024','2025','2026','2027'].map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                          </div>
+                          <div className="flex flex-col gap-1 justify-end">
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase">Periode Aktif</label>
+                            <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-black text-blue-700">{bulanNames[parseInt(laporanBulan)]} {laporanTahun}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+                          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">✓ Berhasil Debet</p>
+                          <p className="text-3xl font-black text-emerald-700 mt-1">{berhasil.length}</p>
+                          <p className="text-[10px] text-emerald-600 mt-0.5 font-semibold">{formatRp(totalMasuk)}</p>
+                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                          <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest">✗ Gagal Debet</p>
+                          <p className="text-3xl font-black text-red-700 mt-1">{gagal.length}</p>
+                          <p className="text-[10px] text-red-600 mt-0.5 font-semibold">{formatRp(totalGagal)}</p>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">— Belum Ada Data</p>
+                          <p className="text-3xl font-black text-amber-700 mt-1">{belumAda.length}</p>
+                          <p className="text-[10px] text-amber-600 mt-0.5 font-semibold">Pedagang</p>
+                        </div>
+                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Tingkat Sukses</p>
+                          <p className="text-3xl font-black text-blue-700 mt-1">{hasil.length > 0 ? Math.round(berhasil.length/hasil.length*100) : 0}%</p>
+                          <p className="text-[10px] text-blue-600 mt-0.5 font-semibold">{hasil.length} transaksi diproses</p>
+                        </div>
+                      </div>
+
+                      {/* Tabel Berhasil */}
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="p-4 sm:p-5 border-b border-slate-100 bg-emerald-50 flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5 text-emerald-600" />
+                          <h3 className="font-extrabold text-emerald-800 text-sm sm:text-base">Berhasil Autodebet — {berhasil.length} Pedagang</h3>
+                        </div>
+                        {berhasil.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400 text-sm">Belum ada data transaksi berhasil untuk periode ini.</div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs sm:text-sm">
+                              <thead className="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">No</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">Nama</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">ID / Kategori</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">Jenis Usaha</th>
+                                  <th className="px-4 py-3 text-right font-bold text-slate-500 uppercase text-[10px] tracking-widest">Nominal Bayar</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">Tgl Transaksi</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {berhasil.map((x, i) => (
+                                  <tr key={i} className="hover:bg-emerald-50/40 transition-colors">
+                                    <td className="px-4 py-2.5 text-slate-400 font-mono text-[10px]">{i+1}</td>
+                                    <td className="px-4 py-2.5 font-semibold text-slate-800">{x.merchant.nama}</td>
+                                    <td className="px-4 py-2.5 text-slate-500 font-mono text-[10px]">{x.merchant.accountId}<br/><span className="text-slate-400">{x.merchant.kategori}</span></td>
+                                    <td className="px-4 py-2.5 text-slate-600 text-[11px]">{x.merchant.jenisUsaha || '-'}</td>
+                                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{formatRp(x.riwayat.nominalBayar)}</td>
+                                    <td className="px-4 py-2.5 text-slate-500 text-[11px]">{x.riwayat.tglUpdate || '-'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tabel Gagal */}
+                      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="p-4 sm:p-5 border-b border-slate-100 bg-red-50 flex items-center gap-2">
+                          <XCircle className="w-5 h-5 text-red-600" />
+                          <h3 className="font-extrabold text-red-800 text-sm sm:text-base">Gagal Autodebet — {gagal.length} Pedagang</h3>
+                        </div>
+                        {gagal.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400 text-sm">Tidak ada transaksi gagal di periode ini 🎉</div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs sm:text-sm">
+                              <thead className="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">No</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">Nama</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">ID / Kategori</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">Jenis Usaha</th>
+                                  <th className="px-4 py-3 text-right font-bold text-slate-500 uppercase text-[10px] tracking-widest">Nominal Tagihan</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">Alasan Gagal</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {gagal.map((x, i) => (
+                                  <tr key={i} className="hover:bg-red-50/40 transition-colors">
+                                    <td className="px-4 py-2.5 text-slate-400 font-mono text-[10px]">{i+1}</td>
+                                    <td className="px-4 py-2.5 font-semibold text-slate-800">{x.merchant.nama}</td>
+                                    <td className="px-4 py-2.5 text-slate-500 font-mono text-[10px]">{x.merchant.accountId}<br/><span className="text-slate-400">{x.merchant.kategori}</span></td>
+                                    <td className="px-4 py-2.5 text-slate-600 text-[11px]">{x.merchant.jenisUsaha || '-'}</td>
+                                    <td className="px-4 py-2.5 text-right font-bold text-red-600">{formatRp(x.riwayat.nominalTagihan)}</td>
+                                    <td className="px-4 py-2.5">
+                                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-800 rounded-lg text-[10px] font-bold">
+                                        {x.riwayat.keterangan ? x.riwayat.keterangan.replace('✗ ', '') : 'Gagal Debet'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tabel Belum Ada Data */}
+                      {belumAda.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                          <div className="p-4 sm:p-5 border-b border-slate-100 bg-amber-50 flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-amber-500" />
+                            <h3 className="font-extrabold text-amber-800 text-sm sm:text-base">Belum Ada Data Transaksi — {belumAda.length} Pedagang</h3>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs sm:text-sm">
+                              <thead className="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">No</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">Nama</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">ID / Kategori</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">Jenis Usaha</th>
+                                  <th className="px-4 py-3 text-left font-bold text-slate-500 uppercase text-[10px] tracking-widest">Lokasi</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {belumAda.slice(0, 100).map((m, i) => (
+                                  <tr key={i} className="hover:bg-amber-50/30 transition-colors opacity-75">
+                                    <td className="px-4 py-2.5 text-slate-400 font-mono text-[10px]">{i+1}</td>
+                                    <td className="px-4 py-2.5 font-semibold text-slate-700">{m.nama}</td>
+                                    <td className="px-4 py-2.5 text-slate-500 font-mono text-[10px]">{m.accountId}<br/><span className="text-slate-400">{m.kategori}</span></td>
+                                    <td className="px-4 py-2.5 text-slate-500 text-[11px]">{m.jenisUsaha || '-'}</td>
+                                    <td className="px-4 py-2.5 text-slate-500 text-[11px] max-w-[180px] truncate">{m.keterangan}</td>
+                                  </tr>
+                                ))}
+                                {belumAda.length > 100 && (
+                                  <tr><td colSpan={5} className="px-4 py-3 text-center text-xs text-slate-400">... dan {belumAda.length - 100} pedagang lainnya (unduh Excel untuk data lengkap)</td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                                {/* 6. REKON LAPORAN */}
                 {userRole === 'admin' && activeMenu === 'rekon' && (
                   <div className="max-w-4xl mx-auto space-y-6">
                     <div className="bg-white p-6 sm:p-8 rounded-xl shadow-sm border border-slate-200">
