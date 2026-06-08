@@ -817,7 +817,7 @@ export default function App() {
       else if (statusSpesial === 'TUTUP') tutupOperasional++; 
       else if (statusSpesial === 'BUKA') { hariBiasa++; hariBukaSpesial++; }
       else if (dayOfWeek === 1) tutupOperasional++; 
-      else if (dayOfWeek === 0 || dayOfWeek === 6) hariRamai++; 
+      else if (dayOfWeek === 0) hariRamai++; 
       else hariBiasa++; 
     }
     return { hariBiasa, hariRamai, tutupOperasional, hariBukaSpesial, tarifHarianFull: (hariBiasa * 10000) + (hariRamai * 15000), tarifHarianNonstop: (hariBiasa * 10000) + (tutupOperasional * 10000) + (hariRamai * 15000), tarifWeekendSaja: (hariRamai * 15000) + (hariBukaSpesial * 10000) };
@@ -870,7 +870,7 @@ export default function App() {
         isWeekendOrHoliday = false;
       } else if (dayOfWeek === 1) {
         isTutup = true;
-      } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+      } else if (dayOfWeek === 0) {
         isWeekendOrHoliday = true;
       }
 
