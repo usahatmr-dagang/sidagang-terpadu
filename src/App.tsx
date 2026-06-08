@@ -808,7 +808,7 @@ export default function App() {
   };
 
   const getKalkulasiBulan = (bulan, tahun) => {
-    const daysInMonth = new Date(tahun, bulan, 0).getDate(); let hariBiasa = 0, hariRamai = 0, tutupOperasional = 0, hariBukaSpesial = 0;
+    const daysInMonth = new Date(tahun, bulan, 0).getDate(); let hariBiasa = 0, hariRamai = 0, tutupOperasional = 0, hariBukaSpesial = 0, hariSabtu = 0;
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(tahun, bulan - 1, i); const dayOfWeek = date.getDay(); const dateStr = `${tahun}-${String(bulan).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
       const statusSpesial = specialDates[dateStr]?.type;
@@ -818,9 +818,10 @@ export default function App() {
       else if (statusSpesial === 'BUKA') { hariBiasa++; hariBukaSpesial++; }
       else if (dayOfWeek === 1) tutupOperasional++; 
       else if (dayOfWeek === 0) hariRamai++; 
+      else if (dayOfWeek === 6) { hariBiasa++; hariSabtu++; }
       else hariBiasa++; 
     }
-    return { hariBiasa, hariRamai, tutupOperasional, hariBukaSpesial, tarifHarianFull: (hariBiasa * 10000) + (hariRamai * 15000), tarifHarianNonstop: (hariBiasa * 10000) + (tutupOperasional * 10000) + (hariRamai * 15000), tarifWeekendSaja: (hariRamai * 15000) + (hariBukaSpesial * 10000) };
+    return { hariBiasa, hariRamai, tutupOperasional, hariBukaSpesial, hariSabtu, tarifHarianFull: (hariBiasa * 10000) + (hariRamai * 15000), tarifHarianNonstop: (hariBiasa * 10000) + (tutupOperasional * 10000) + (hariRamai * 15000), tarifWeekendSaja: (hariRamai * 15000) + (hariBukaSpesial * 10000) + (hariSabtu * 10000) };
   };
   const calStats = useMemo(() => getKalkulasiBulan(calMonth, calYear), [calMonth, calYear, specialDates]);
 
@@ -878,7 +879,7 @@ export default function App() {
       if (effectiveTipeTarif === 'HARIAN_WEEKEND') {
         if (isWeekendOrHoliday) {
           totalBill += weekendRate;
-        } else if (statusSpesial === 'BUKA') {
+        } else if (dayOfWeek === 6 || statusSpesial === 'BUKA') {
           totalBill += weekdayRate;
         }
       } else if (effectiveTipeTarif === 'HARIAN_FULL_NONSTOP') {
