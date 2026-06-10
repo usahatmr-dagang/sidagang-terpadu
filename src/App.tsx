@@ -821,7 +821,7 @@ export default function App() {
       else if (dayOfWeek === 6) { hariBiasa++; hariSabtu++; }
       else hariBiasa++; 
     }
-    return { hariBiasa, hariRamai, tutupOperasional, hariBukaSpesial, hariSabtu, tarifHarianFull: (hariBiasa * 10000) + (hariRamai * 15000), tarifHarianNonstop: (hariBiasa * 10000) + (tutupOperasional * 10000) + (hariRamai * 15000), tarifWeekendSaja: (hariRamai * 15000) + (hariBukaSpesial * 10000) + (hariSabtu * 10000) };
+    return { hariBiasa, hariRamai, tutupOperasional, hariBukaSpesial, hariSabtu, tarifHarianFull: (hariBiasa * 10000) + (hariRamai * 15000), tarifHarianNonstop: (hariBiasa * 10000) + (tutupOperasional * 10000) + (hariRamai * 15000), tarifWeekendSaja: (hariRamai * 15000) + (hariBukaSpesial * 10000) + (hariSabtu * 10000), tarifFotoHarian: (hariBiasa * 15000) + (hariRamai * 15000) };
   };
   const calStats = useMemo(() => getKalkulasiBulan(calMonth, calYear), [calMonth, calYear, specialDates]);
 
@@ -843,6 +843,11 @@ export default function App() {
     // Default rates
     let weekdayRate = 10000;
     let weekendRate = 15000;
+
+    // Tarif khusus untuk JURU FOTO (Flat 15.000 setiap hari)
+    if (merchant.kategori === 'JURU FOTO' || (merchant.jenisUsaha && merchant.jenisUsaha.trim().toUpperCase() === 'JURU FOTO')) {
+      weekdayRate = 15000;
+    }
 
     // Schedule: fallback to merchant's own tipeTarif
     let effectiveTipeTarif = merchant.tipeTarif;
@@ -2217,11 +2222,15 @@ export default function App() {
                               <p className="text-2xl font-bold text-emerald-400">{formatRp(calStats.tarifHarianNonstop)}</p>
                             </div>
                             <div>
-                              <p className="text-[11px] text-slate-300 uppercase font-bold tracking-wide">2. PKL / Foto (Senin Libur)</p>
+                              <p className="text-[11px] text-slate-300 uppercase font-bold tracking-wide">2. PKL (Senin Libur)</p>
                               <p className="text-xl font-bold text-white">{formatRp(calStats.tarifHarianFull)}</p>
                             </div>
                             <div>
-                              <p className="text-[11px] text-slate-300 uppercase font-bold tracking-wide">3. Tikar (Weekend Saja)</p>
+                              <p className="text-[11px] text-slate-300 uppercase font-bold tracking-wide">3. Juru Foto (Senin Libur)</p>
+                              <p className="text-xl font-bold text-white">{formatRp(calStats.tarifFotoHarian)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] text-slate-300 uppercase font-bold tracking-wide">4. Tikar (Weekend Saja)</p>
                               <p className="text-xl font-bold text-white">{formatRp(calStats.tarifWeekendSaja)}</p>
                             </div>
                             {tradeRates.length > 0 && (
