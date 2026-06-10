@@ -1016,12 +1016,13 @@ export default function App() {
     const idCountMap = {}; targetMerchants.forEach(m => { idCountMap[m.accountId] = (idCountMap[m.accountId] || 0) + 1; }); const currentIdCount = {};
     const tglJatuhTempoText = String(formGenerate.tglJatuhTempo).padStart(2, '0');
     const tglMulaiArr = formGenerate.tglMulaiBayar.split('-');
-    const tglMulaiBayarDate = tglMulaiArr.length === 3 ? new Date(parseInt(tglMulaiArr[0]), parseInt(tglMulaiArr[1]) - 1, parseInt(tglMulaiArr[2]), 12, 0, 0) : formGenerate.tglMulaiBayar;
+    // Format menjadi string DD/MM/YYYY agar tidak mengandung jam
+    const tglMulaiBayarStr = tglMulaiArr.length === 3 ? `${tglMulaiArr[2]}/${tglMulaiArr[1]}/${tglMulaiArr[0]}` : formGenerate.tglMulaiBayar;
 
     const dataToExport = targetMerchants.map(m => {
       let t = calculateMerchantBill(m, specialDates, tradeRates, targetBulan, targetTahun);
       currentIdCount[m.accountId] = (currentIdCount[m.accountId] || 0) + 1; let periodeFinal = formGenerate.periode; if (idCountMap[m.accountId] > 1) { periodeFinal = `${formGenerate.periode}  ${currentIdCount[m.accountId]}`; }
-      return { "ACCOUNT ID": m.accountId ? String(m.accountId) : '', "NAMA NASABAH": m.nama, "KETERANGAN 1": m.keterangan, "KETERANGAN 2": periodeFinal, "KETERANGAN 3": (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha : formGenerate.keterangan3, "JENIS TAGIHAN": formGenerate.jenisTagihan, "DESKRIPSI": formGenerate.deskripsi, "NO URUT BAYAR": "1", "METODE BAYAR": "AUTODEBET", "JUMLAH TAGIHAN": t + m.totalTunggakan, "TANGGAL MULAI BAYAR": tglMulaiBayarDate, "TANGGAL JATUH TEMPO": tglJatuhTempoText, "JENIS REKENING SUMBER": m.rekeningSumber ? 'KONVEN' : '', "REKENING SUMBER": m.rekeningSumber, "JENIS REKENING TUJUAN": formGenerate.jenisRekTujuan, "REKENING TUJUAN": formGenerate.rekTujuan, "KODE PLAN": formGenerate.kodePlan, "NO HP": (m.noHp && m.noHp !== '-') ? m.noHp : '', "EMAIL": formGenerate.defaultEmail, "LATITUDE": m.lat, "LONGITUDE": m.lng };
+      return { "ACCOUNT ID": m.accountId ? String(m.accountId) : '', "NAMA NASABAH": m.nama, "KETERANGAN 1": m.keterangan, "KETERANGAN 2": periodeFinal, "KETERANGAN 3": (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha : formGenerate.keterangan3, "JENIS TAGIHAN": formGenerate.jenisTagihan, "DESKRIPSI": formGenerate.deskripsi, "NO URUT": "1", "METODE EKSEKUSI": "AUTODEBET", "JUMLAH TAGIHAN": t + m.totalTunggakan, "TANGGAL MULAI BAYAR": tglMulaiBayarStr, "TANGGAL": tglJatuhTempoText, "JENIS REKENING SUMBER": m.rekeningSumber ? 'KONVEN' : '', "REKENING SUMBER": m.rekeningSumber, "JENIS REKENING TUJUAN": formGenerate.jenisRekTujuan, "REKENING TUJUAN": formGenerate.rekTujuan, "KODE PLAN": formGenerate.kodePlan, "NO HP": (m.noHp && m.noHp !== '-') ? m.noHp : '', "EMAIL": formGenerate.defaultEmail };
     });
     const ws = window.XLSX.utils.json_to_sheet(dataToExport); 
     
@@ -1033,6 +1034,7 @@ export default function App() {
       colsToText.forEach(C => {
         const cellAddress = window.XLSX.utils.encode_cell({r: R, c: C});
         if(ws[cellAddress]) {
+          ws[cellAddress].v = String(ws[cellAddress].v); // Konversi nilai ke string
           ws[cellAddress].t = 's'; // Pastikan tipenya string
           ws[cellAddress].z = '@'; // Pastikan formatnya Text
         }
@@ -1040,7 +1042,9 @@ export default function App() {
       // Format Date untuk kolom K (TANGGAL MULAI BAYAR)
       const dateCellAddress = window.XLSX.utils.encode_cell({r: R, c: 10});
       if(ws[dateCellAddress]) {
-        ws[dateCellAddress].z = 'dd/mm/yyyy'; // Pastikan formatnya Date
+        ws[dateCellAddress].v = String(ws[dateCellAddress].v); // Konversi nilai ke string
+        ws[dateCellAddress].t = 's'; // Pastikan tipenya string
+        ws[dateCellAddress].z = '@'; // Pastikan formatnya text tanpa jam
       }
     }
     
