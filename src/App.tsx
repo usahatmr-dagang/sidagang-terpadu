@@ -877,7 +877,9 @@ export default function App() {
 
       // Apply logic based on schedule
       if (effectiveTipeTarif === 'HARIAN_WEEKEND') {
-        if (isWeekendOrHoliday) {
+        if (isTutup) {
+          // No charge
+        } else if (isWeekendOrHoliday) {
           totalBill += weekendRate;
         } else if (dayOfWeek === 6 || statusSpesial === 'BUKA') {
           totalBill += weekdayRate;
