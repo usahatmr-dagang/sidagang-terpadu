@@ -1021,7 +1021,22 @@ export default function App() {
       currentIdCount[m.accountId] = (currentIdCount[m.accountId] || 0) + 1; let periodeFinal = formGenerate.periode; if (idCountMap[m.accountId] > 1) { periodeFinal = `${formGenerate.periode}  ${currentIdCount[m.accountId]}`; }
       return { "ACCOUNT ID": m.accountId ? String(m.accountId) : '', "NAMA NASABAH": m.nama, "KETERANGAN 1": m.keterangan, "KETERANGAN 2": periodeFinal, "KETERANGAN 3": (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha : formGenerate.keterangan3, "JENIS TAGIHAN": formGenerate.jenisTagihan, "DESKRIPSI": formGenerate.deskripsi, "NO URUT BAYAR": "1", "METODE BAYAR": "AUTODEBET", "JUMLAH TAGIHAN": t + m.totalTunggakan, "TANGGAL MULAI BAYAR": formGenerate.tglMulaiBayar, "TANGGAL JATUH TEMPO": tglJatuhTempoText, "JENIS REKENING SUMBER": m.rekeningSumber ? 'KONVEN' : '', "REKENING SUMBER": m.rekeningSumber, "JENIS REKENING TUJUAN": formGenerate.jenisRekTujuan, "REKENING TUJUAN": formGenerate.rekTujuan, "KODE PLAN": formGenerate.kodePlan, "NO HP": (m.noHp && m.noHp !== '-') ? m.noHp : '', "EMAIL": formGenerate.defaultEmail, "LATITUDE": m.lat, "LONGITUDE": m.lng };
     });
-    const ws = window.XLSX.utils.json_to_sheet(dataToExport); const wb = window.XLSX.utils.book_new(); window.XLSX.utils.book_append_sheet(wb, ws, "Sheet1"); window.XLSX.writeFile(wb, `UPLOAD_JAKONE_${formGenerate.jenisTagihan.replace(/\s+/g, '')}_${formGenerate.periode.replace('/', '_')}.xlsx`);
+    const ws = window.XLSX.utils.json_to_sheet(dataToExport); 
+    
+    // Paksa format sel menjadi "Text" (@) untuk kolom A, H, dan L
+    const range = window.XLSX.utils.decode_range(ws['!ref']);
+    for(let R = 1; R <= range.e.r; ++R) { // Mulai dari baris 1 (lewati header)
+      const colsToText = [0, 7, 11]; // 0=A (ACCOUNT ID), 7=H (NO URUT BAYAR), 11=L (TGL JATUH TEMPO)
+      colsToText.forEach(C => {
+        const cellAddress = window.XLSX.utils.encode_cell({r: R, c: C});
+        if(ws[cellAddress]) {
+          ws[cellAddress].t = 's'; // Pastikan tipenya string
+          ws[cellAddress].z = '@'; // Pastikan formatnya Text
+        }
+      });
+    }
+    
+    const wb = window.XLSX.utils.book_new(); window.XLSX.utils.book_append_sheet(wb, ws, "Sheet1"); window.XLSX.writeFile(wb, `UPLOAD_JAKONE_${formGenerate.jenisTagihan.replace(/\s+/g, '')}_${formGenerate.periode.replace('/', '_')}.xlsx`);
   };
 
   const handleUploadReport = (e) => {
