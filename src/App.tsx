@@ -1014,12 +1014,14 @@ export default function App() {
     if (targetMerchants.length === 0) return showToast(`Tidak ada data untuk kategori ini.`, "error");
     const [mmStr, yyyyStr] = formGenerate.periode.split('/'); const targetBulan = parseInt(mmStr, 10) || calMonth; const targetTahun = parseInt(yyyyStr, 10) || calYear; const calc = getKalkulasiBulan(targetBulan, targetTahun);
     const idCountMap = {}; targetMerchants.forEach(m => { idCountMap[m.accountId] = (idCountMap[m.accountId] || 0) + 1; }); const currentIdCount = {};
-    const tglJatuhTempoText = `${String(formGenerate.tglJatuhTempo).padStart(2, '0')}/${String(targetBulan).padStart(2, '0')}/${targetTahun}`;
+    const tglJatuhTempoText = String(formGenerate.tglJatuhTempo).padStart(2, '0');
+    const tglMulaiArr = formGenerate.tglMulaiBayar.split('-');
+    const tglMulaiBayarFormatted = tglMulaiArr.length === 3 ? `${tglMulaiArr[2]}/${tglMulaiArr[1]}/${tglMulaiArr[0]}` : formGenerate.tglMulaiBayar;
 
     const dataToExport = targetMerchants.map(m => {
       let t = calculateMerchantBill(m, specialDates, tradeRates, targetBulan, targetTahun);
       currentIdCount[m.accountId] = (currentIdCount[m.accountId] || 0) + 1; let periodeFinal = formGenerate.periode; if (idCountMap[m.accountId] > 1) { periodeFinal = `${formGenerate.periode}  ${currentIdCount[m.accountId]}`; }
-      return { "ACCOUNT ID": m.accountId ? String(m.accountId) : '', "NAMA NASABAH": m.nama, "KETERANGAN 1": m.keterangan, "KETERANGAN 2": periodeFinal, "KETERANGAN 3": (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha : formGenerate.keterangan3, "JENIS TAGIHAN": formGenerate.jenisTagihan, "DESKRIPSI": formGenerate.deskripsi, "NO URUT BAYAR": "1", "METODE BAYAR": "AUTODEBET", "JUMLAH TAGIHAN": t + m.totalTunggakan, "TANGGAL MULAI BAYAR": formGenerate.tglMulaiBayar, "TANGGAL JATUH TEMPO": tglJatuhTempoText, "JENIS REKENING SUMBER": m.rekeningSumber ? 'KONVEN' : '', "REKENING SUMBER": m.rekeningSumber, "JENIS REKENING TUJUAN": formGenerate.jenisRekTujuan, "REKENING TUJUAN": formGenerate.rekTujuan, "KODE PLAN": formGenerate.kodePlan, "NO HP": (m.noHp && m.noHp !== '-') ? m.noHp : '', "EMAIL": formGenerate.defaultEmail, "LATITUDE": m.lat, "LONGITUDE": m.lng };
+      return { "ACCOUNT ID": m.accountId ? String(m.accountId) : '', "NAMA NASABAH": m.nama, "KETERANGAN 1": m.keterangan, "KETERANGAN 2": periodeFinal, "KETERANGAN 3": (m.jenisUsaha && m.jenisUsaha !== '-') ? m.jenisUsaha : formGenerate.keterangan3, "JENIS TAGIHAN": formGenerate.jenisTagihan, "DESKRIPSI": formGenerate.deskripsi, "NO URUT BAYAR": "1", "METODE BAYAR": "AUTODEBET", "JUMLAH TAGIHAN": t + m.totalTunggakan, "TANGGAL MULAI BAYAR": tglMulaiBayarFormatted, "TANGGAL JATUH TEMPO": tglJatuhTempoText, "JENIS REKENING SUMBER": m.rekeningSumber ? 'KONVEN' : '', "REKENING SUMBER": m.rekeningSumber, "JENIS REKENING TUJUAN": formGenerate.jenisRekTujuan, "REKENING TUJUAN": formGenerate.rekTujuan, "KODE PLAN": formGenerate.kodePlan, "NO HP": (m.noHp && m.noHp !== '-') ? m.noHp : '', "EMAIL": formGenerate.defaultEmail, "LATITUDE": m.lat, "LONGITUDE": m.lng };
     });
     const ws = window.XLSX.utils.json_to_sheet(dataToExport); 
     
