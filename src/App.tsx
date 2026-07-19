@@ -1065,12 +1065,11 @@ export default function App() {
         merchants.forEach(merchant => {
           const transaksiPedagang = reportData.filter(r => {
             const matchId = String(r['ACCOUNT ID']).trim() === String(merchant.accountId).trim() || String(r['ID TAGIHAN']).trim() === String(merchant.accountId).trim();
-            if (!matchId) return false; if (!r['KETERANGAN 1']) return true; 
-            let locBank = String(r['KETERANGAN 1']).replace(/\s+/g, ' ').trim().toUpperCase(); let locMaster = String(merchant.keterangan).replace(/\s+/g, ' ').trim().toUpperCase();
-            locBank = locBank.replace(/^P\.\s*/, 'PINTU ').replace(/\bP\.\s*/, 'PINTU '); locMaster = locMaster.replace(/^P\.\s*/, 'PINTU ').replace(/\bP\.\s*/, 'PINTU ');
-            if (locBank === locMaster || locBank.includes(locMaster) || locMaster.includes(locBank)) return true; 
-            if (merchant.kategori === 'JURU FOTO' || merchant.kategori === 'TIKAR' || merchant.kategori === 'LISTRIK') return true;
-            return false;
+            if (!matchId) return false;
+            
+            // ACCOUNT ID sudah pasti unik untuk setiap pedagang.
+            // Kita abaikan pengecekan validasi lokasi (KETERANGAN 1) yang sebelumnya terlalu ketat dan sering menyebabkan gagal rekon.
+            return true;
           });
           
           if (transaksiPedagang.length === 0) return;
